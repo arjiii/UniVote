@@ -37,9 +37,14 @@ def create_election(name: str, start_date: str, end_date: str, description: str 
 
 
 def update_election_status(election_id: str, status: str) -> list:
+    payload = {"status": status}
+    if status == "completed":
+        from datetime import timezone
+        payload["ended_at"] = datetime.now(timezone.utc).isoformat()
+        
     result = (
         supabase.table("elections")
-        .update({"status": status})
+        .update(payload)
         .eq("id", election_id)
         .execute()
     )
@@ -57,6 +62,12 @@ def get_active_election() -> dict | None:
 def get_active_elections() -> list:
     """Retrieve all currently active elections."""
     result = supabase.table("elections").select("*").eq("status", "active").execute()
+    return result.data or []
+
+
+def get_available_elections() -> list:
+    """Retrieve all active and completed elections for student access."""
+    result = supabase.table("elections").select("*").in_("status", ["active", "completed"]).execute()
     return result.data or []
 
 

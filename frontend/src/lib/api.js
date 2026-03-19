@@ -3,16 +3,7 @@ import { voterSession } from './stores/session.js';
 
 const BASE = 'http://localhost:8000';
 
-let currentToken = /** @type {string | null} */ (null);
-
-function updateToken() {
-  let staff, voter;
-  authSession.subscribe(s => staff = s)();
-  voterSession.subscribe(s => voter = s)();
-  currentToken = staff?.access_token || voter?.access_token || null;
-}
-authSession.subscribe(updateToken);
-voterSession.subscribe(updateToken);
+// Tokens are now resolved dynamically per-request to avoid cross-role collisions
 
 /**
  * Internal helper: fetch JSON and throw on non-2xx
@@ -21,8 +12,17 @@ voterSession.subscribe(updateToken);
  */
 async function request(path, options = {}) {
   const headers = new Headers(options.headers || {});
-  if (currentToken && !headers.has('Authorization')) {
-    headers.set('Authorization', `Bearer ${currentToken}`);
+  
+  // Resolve the appropriate token based on the path
+  let token = null;
+  if (path.startsWith('/api/student')) {
+    voterSession.subscribe(s => token = s?.access_token)();
+  } else {
+    authSession.subscribe(s => token = s?.access_token)();
+  }
+
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
   }
 
   const mergedOptions = { ...options, headers };

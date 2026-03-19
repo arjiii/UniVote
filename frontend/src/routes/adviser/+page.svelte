@@ -57,19 +57,19 @@
   <!-- Header -->
   <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
     <div>
-      <p class="text-[10px] font-semibold text-stone-400 tracking-widest uppercase mb-1">Adviser</p>
-      <h1 class="text-2xl font-semibold text-stone-900">
+      <p class="text-[10px] font-semibold text-stone-400 dark:text-stone-500 tracking-widest uppercase mb-1">Adviser</p>
+      <h1 class="text-2xl font-semibold text-stone-900 dark:text-white">
         Hello, {$authSession?.full_name?.split(' ')[0] || 'Adviser'}
       </h1>
-      <p class="text-stone-500 text-sm mt-0.5">Your election command center.</p>
+      <p class="text-stone-500 dark:text-stone-400 text-sm mt-0.5">Your election command center.</p>
     </div>
 
-    <div class="flex items-center gap-3 bg-white border border-stone-200 rounded-xl px-4 py-2.5 w-fit">
-      <label for="election-select" class="text-[10px] font-semibold text-stone-400 uppercase tracking-widest whitespace-nowrap">Election</label>
+    <div class="flex items-center gap-3 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl px-4 py-2.5 w-fit">
+      <label for="election-select" class="text-[10px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-widest whitespace-nowrap">Election</label>
       <select 
         id="election-select"
         bind:value={$selectedElectionId}
-        class="bg-transparent border-none text-sm font-semibold text-stone-900 focus:outline-none cursor-pointer min-w-[180px]"
+        class="bg-transparent border-none text-sm font-semibold text-stone-900 dark:text-white focus:outline-none cursor-pointer min-w-[180px]"
       >
         <option value="" disabled>Select election</option>
         {#each elections as election}
@@ -82,39 +82,39 @@
   <!-- Stats -->
   <div class="grid grid-cols-3 gap-4">
     {#each [{ label: 'Candidates', value: summary.candidates }, { label: 'Partylists', value: summary.partylists }, { label: 'Cast Ballots', value: summary.totalVotes }] as stat}
-      <div class="bg-white rounded-2xl border border-stone-200 p-5">
-        <p class="text-[10px] font-semibold text-stone-400 tracking-widest uppercase mb-2">{stat.label}</p>
-        <p class="text-3xl font-semibold text-stone-900">{stat.value}</p>
+      <div class="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-700 p-5">
+        <p class="text-[10px] font-semibold text-stone-400 dark:text-stone-500 tracking-widest uppercase mb-2">{stat.label}</p>
+        <p class="text-3xl font-semibold text-stone-900 dark:text-white">{stat.value}</p>
       </div>
     {/each}
   </div>
 
   <!-- Nav Cards -->
   <div>
-    <p class="text-[10px] font-semibold text-stone-400 tracking-widest uppercase mb-3">Management Console</p>
+    <p class="text-[10px] font-semibold text-stone-400 dark:text-stone-500 tracking-widest uppercase mb-3">Management Console</p>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {#each navCards as card}
         <a 
           href={card.path}
-          class="group bg-white border border-stone-200 rounded-2xl p-5 hover:border-stone-300 hover:-translate-y-[2px] hover:shadow-[0_8px_30px_-6px_rgba(0,0,0,0.08)] transition-all duration-200"
+          class="group bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-2xl p-5 hover:border-stone-300 dark:hover:border-stone-600 hover:-translate-y-[2px] hover:shadow-[0_8px_30px_-6px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_8px_30px_-6px_rgba(0,0,0,0.3)] transition-all duration-200"
         >
           <div class="flex items-start justify-between mb-4">
-            <div class="w-10 h-10 bg-stone-100 rounded-xl flex items-center justify-center group-hover:bg-stone-200 transition-colors">
-              <svg class="w-5 h-5 text-stone-600" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+            <div class="w-10 h-10 bg-stone-100 dark:bg-stone-800 rounded-xl flex items-center justify-center group-hover:bg-stone-200 dark:group-hover:bg-stone-700 transition-colors">
+              <svg class="w-5 h-5 text-stone-600 dark:text-stone-300" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d={card.icon}/>
               </svg>
             </div>
-            <svg class="w-4 h-4 text-stone-300 group-hover:text-stone-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M7 7h10v10"/></svg>
+            <svg class="w-4 h-4 text-stone-300 dark:text-stone-600 group-hover:text-stone-600 dark:group-hover:text-stone-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M7 7h10v10"/></svg>
           </div>
-          <h3 class="text-sm font-semibold text-stone-900 mb-0.5">{card.name}</h3>
-          <p class="text-xs text-stone-500 leading-relaxed">{card.desc}</p>
+          <h3 class="text-sm font-semibold text-stone-900 dark:text-white mb-0.5">{card.name}</h3>
+          <p class="text-xs text-stone-500 dark:text-stone-400 leading-relaxed">{card.desc}</p>
         </a>
       {/each}
     </div>
   </div>
 
   <!-- Audit CTA -->
-  <div class="bg-stone-900 rounded-2xl p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+  <div class="bg-stone-900 dark:bg-stone-800 rounded-2xl p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
     <div>
       <h2 class="text-base font-semibold text-white mb-1">Need to review activity?</h2>
       <p class="text-stone-400 text-sm">Every admin action is logged with precision timestamps.</p>

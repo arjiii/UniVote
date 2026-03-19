@@ -1,19 +1,26 @@
 from fastapi import HTTPException
 from database import supabase
+from services import election_service
+from deps import create_access_token
+from datetime import timedelta
 import hashlib
 import time
 
 
 def validate_student(student_id: str) -> dict:
-    """Check that a student exists and return all active elections with a secure access token."""
-    from services import election_service
-    from deps import create_access_token
-    from datetime import timedelta
+    """Check that a student exists and return all active/completed elections with a secure access token."""
+    available_elections = election_service.get_available_elections()
+    if not available_elections:
+        raise HTTPException(status_code=400, detail="No active or completed elections currently available.")
 
-    # Get ALL active elections
-    active_elections = election_service.get_active_elections()
-    if not active_elections:
-        raise HTTPException(status_code=400, detail="No active elections currently in progress.")
+    # Role guard: check if this ID belongs to an adviser or admin to prevent unauthorized access
+    adviser_check = supabase.table("advisers").select("id").eq("email", student_id).execute()
+    admin_check = supabase.table("admins").select("id").eq("email", student_id).execute()
+    if adviser_check.data or admin_check.data:
+        raise HTTPException(
+            status_code=403,
+            detail="This ID belongs to a staff account. Only registered students can access the voting portal."
+        )
 
     result = supabase.table("students").select("*").eq("student_id", student_id).execute()
 
@@ -39,7 +46,7 @@ def validate_student(student_id: str) -> dict:
 
     # Annotate each election with has_voted
     elections_with_status = []
-    for election in active_elections:
+    for election in available_elections:
         elections_with_status.append({
             **election,
             "has_voted": election["id"] in voted_election_ids

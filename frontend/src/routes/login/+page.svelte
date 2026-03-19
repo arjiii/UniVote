@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { auth as authApi } from '$lib/api.js';
   import { authSession } from '$lib/stores/auth.js';
+  import { theme, toggleTheme } from '$lib/stores/theme.js';
   import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
   import { fade, fly } from 'svelte/transition';
 
@@ -44,46 +45,49 @@
   <title>Sign In | UniVote Staff Portal</title>
 </svelte:head>
 
-<div class="min-h-screen flex bg-[#f9f8f6]">
+<div class="min-h-screen flex bg-stone-50 dark:bg-stone-950 transition-colors duration-500" class:dark={$theme === 'dark'}>
 
-  <!-- Left branding panel (dark) -->
-  <div class="hidden lg:flex w-[44%] bg-stone-900 flex-col justify-between p-10 relative overflow-hidden flex-shrink-0">
-    <!-- Subtle grid -->
-    <div class="absolute inset-0 opacity-[0.04]"
-      style="background-image:linear-gradient(rgba(255,255,255,1) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,1) 1px,transparent 1px);background-size:48px 48px"></div>
+  <!-- Left panel: brand + trust signals -->
+  <div class="hidden lg:flex w-[44%] flex-col justify-between bg-stone-900 border-r border-stone-800 p-10 relative overflow-hidden flex-shrink-0">
+    <!-- Decorative circles -->
+    <div class="absolute -top-32 -left-32 w-80 h-80 rounded-full border-[40px] border-stone-800/50 pointer-events-none"></div>
+    <div class="absolute -top-16 -left-16 w-48 h-48 rounded-full border-[20px] border-stone-700/30 pointer-events-none"></div>
 
-    <div class="relative">
-      <div class="flex items-center gap-2.5">
-        <div class="w-7 h-7 bg-white rounded-md flex items-center justify-center text-stone-900 text-xs font-bold">U</div>
-        <span class="text-white font-semibold text-sm tracking-tight">UniVote</span>
-      </div>
+    <div class="relative flex items-center gap-3">
+      <button 
+        onclick={toggleTheme}
+        class="w-8 h-8 bg-stone-50 rounded-xl flex items-center justify-center text-stone-950 text-xs font-black shadow-xl hover:shadow-brand-500/20 hover:scale-110 hover:rotate-3 active:scale-95 transition-all duration-300 outline-none"
+      >
+        U
+      </button>
+      <span class="font-bold text-sm tracking-tight text-white">UniVote</span>
     </div>
 
     <div class="relative">
-      <div class="inline-flex items-center gap-2 bg-white/10 border border-white/10 rounded-full px-3 py-1 mb-6">
-        <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full block"></span>
-        <span class="text-xs text-white/70 font-medium">Secure E-Voting</span>
+      <div class="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-3 py-1 mb-8">
+        <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full block animate-pulse"></span>
+        <span class="text-[10px] text-white/50 font-bold uppercase tracking-widest">Secure E-Voting</span>
       </div>
-      <h2 class="text-4xl text-white leading-[1.15] mb-4" style="font-family:'Instrument Serif',Georgia,serif">
-        The future of<br/><em>campus elections.</em>
+      <h2 class="text-4xl text-white leading-[1.1] mb-6 font-black tracking-tighter">
+        The future of<br/><span class="text-stone-400">campus elections.</span>
       </h2>
-      <p class="text-stone-400 text-sm leading-relaxed max-w-xs">
+      <p class="text-stone-400 text-sm leading-relaxed max-w-xs font-medium">
         Transparent, secure, and accessible digital voting for your university community.
       </p>
 
-      <div class="grid grid-cols-2 gap-3 mt-8">
-        <div class="bg-white/5 border border-white/8 rounded-xl p-4">
-          <p class="text-white text-xl font-semibold mb-0.5">100%</p>
-          <p class="text-stone-500 text-xs">Encrypted Votes</p>
+      <div class="grid grid-cols-2 gap-4 mt-10">
+        <div class="bg-white/5 border border-white/5 rounded-2xl p-5 backdrop-blur-sm">
+          <p class="text-white text-2xl font-black mb-1">100%</p>
+          <p class="text-stone-500 text-[10px] font-bold uppercase tracking-wider">Encrypted</p>
         </div>
-        <div class="bg-white/5 border border-white/8 rounded-xl p-4">
-          <p class="text-white text-xl font-semibold mb-0.5">Live</p>
-          <p class="text-stone-500 text-xs">Result Tracking</p>
+        <div class="bg-white/5 border border-white/5 rounded-2xl p-5 backdrop-blur-sm">
+          <p class="text-white text-2xl font-black mb-1">Live</p>
+          <p class="text-stone-500 text-[10px] font-bold uppercase tracking-wider">Tracking</p>
         </div>
       </div>
     </div>
 
-    <p class="relative text-stone-600 text-xs">© 2025 UniVote. All rights reserved.</p>
+    <p class="relative text-stone-600 text-[10px] font-bold uppercase tracking-widest">© 2025 UniVote. All rights reserved.</p>
   </div>
 
   <!-- Right form panel -->
@@ -91,47 +95,52 @@
     <div class="w-full max-w-sm">
 
       <!-- Mobile logo -->
-      <div class="lg:hidden flex items-center gap-2 mb-8">
-        <div class="w-7 h-7 bg-stone-900 rounded-md flex items-center justify-center text-white text-xs font-bold">U</div>
-        <span class="font-semibold text-sm">UniVote</span>
+      <div class="lg:hidden flex items-center gap-3 mb-10">
+        <button 
+          onclick={toggleTheme}
+          class="w-8 h-8 bg-stone-900 dark:bg-stone-50 rounded-xl flex items-center justify-center text-white dark:text-stone-950 text-xs font-black shadow-xl hover:scale-110 active:scale-95 transition-all outline-none"
+        >
+          U
+        </button>
+        <span class="font-bold text-sm dark:text-white transition-colors">UniVote</span>
       </div>
 
       <div in:fly={{ y: 14, duration: 400, delay: 50 }}>
-        <h1 class="text-2xl font-semibold text-stone-900 mb-1">Welcome back</h1>
-        <p class="text-stone-500 text-sm">Sign in to your staff account</p>
+        <h1 class="text-3xl font-black text-stone-950 dark:text-white mb-2 tracking-tighter transition-colors">Welcome back</h1>
+        <p class="text-stone-500 dark:text-stone-400 text-sm font-medium transition-colors">Sign in to your staff portal</p>
       </div>
 
       <form onsubmit={handleLogin} class="mt-8 space-y-4" in:fly={{ y: 14, duration: 400, delay: 120 }}>
 
         <!-- Email -->
         <div>
-          <label for="email" class="block text-xs font-semibold text-stone-500 tracking-wide uppercase mb-1.5">Email Address</label>
+          <label for="email" class="block text-xs font-semibold text-stone-500 dark:text-stone-400 tracking-wide uppercase mb-1.5">Email Address</label>
           <input 
             type="email" 
             id="email" 
             bind:value={email} 
             placeholder="admin@univote.edu"
-            class="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 text-sm text-stone-900 placeholder-stone-300 transition-all duration-200 focus:outline-none focus:border-stone-900 focus:ring-[3px] focus:ring-stone-900/[0.06]"
+            class="input-base"
             required
           >
         </div>
 
         <!-- Password -->
         <div>
-          <label for="password" class="block text-xs font-semibold text-stone-500 tracking-wide uppercase mb-1.5">Password</label>
+          <label for="password" class="block text-xs font-semibold text-stone-500 dark:text-stone-400 tracking-wide uppercase mb-1.5">Password</label>
           <div class="relative">
             <input 
               type={showPassword ? 'text' : 'password'}
               id="password" 
               bind:value={password} 
               placeholder="••••••••"
-              class="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 pr-12 text-sm text-stone-900 placeholder-stone-300 transition-all duration-200 focus:outline-none focus:border-stone-900 focus:ring-[3px] focus:ring-stone-900/[0.06]"
+              class="input-base pr-12"
               required
             >
             <button 
               type="button" 
               onclick={() => showPassword = !showPassword}
-              class="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 transition-colors"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
             >
               {#if showPassword}
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
@@ -155,24 +164,24 @@
           <button 
             type="submit" 
             disabled={isSubmitting}
-            class="w-full bg-stone-900 text-white rounded-xl py-3 text-sm font-semibold transition-all duration-200 hover:bg-stone-800 active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
+            class="btn-premium w-full py-4 text-sm font-black shadow-2xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 relative overflow-hidden"
           >
             {#if isSubmitting}
               <LoadingSpinner />
               <span>Signing in...</span>
             {:else}
               <span>Sign In</span>
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
             {/if}
           </button>
         </div>
       </form>
 
-      <div class="mt-6 pt-6 border-t border-stone-200 text-center space-y-3" in:fly={{ y: 14, duration: 400, delay: 200 }}>
-        <p class="text-xs text-stone-500">
-          Need portal access? <a href="/register" class="text-stone-900 font-medium hover:underline">Request Account</a>
+      <div class="mt-6 pt-6 border-t border-stone-200 dark:border-stone-700 text-center space-y-3" in:fly={{ y: 14, duration: 400, delay: 200 }}>
+        <p class="text-xs text-stone-500 dark:text-stone-400">
+          Need portal access? <a href="/register" class="text-stone-900 dark:text-white font-medium hover:underline">Request Account</a>
         </p>
-        <a href="/" class="inline-flex items-center gap-1 text-xs text-stone-400 hover:text-stone-700 transition-colors">
+        <a href="/" class="inline-flex items-center gap-1 text-xs text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors">
           <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 19l-7-7 7-7"/></svg>
           Back to home
         </a>

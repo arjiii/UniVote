@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { authSession } from '$lib/stores/auth.js';
   import { voterSession } from '$lib/stores/session.js';
+  import { toggleTheme } from '$lib/stores/theme.js';
   import { fade, fly } from 'svelte/transition';
 
   onMount(() => {
@@ -18,89 +19,97 @@
   <title>UniVote — Secure Campus Elections</title>
 </svelte:head>
 
-<div class="bg-[#f9f8f6] text-stone-900 min-h-screen flex flex-col">
+<div class="bg-[#f9f8f6] dark:bg-stone-950 text-stone-900 dark:text-stone-100 min-h-screen flex flex-col transition-colors duration-300">
 
   <!-- NAV -->
-  <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-stone-200/80">
-    <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-      <div class="flex items-center gap-2.5">
-        <div class="w-7 h-7 bg-stone-900 rounded-md flex items-center justify-center text-white text-xs font-bold tracking-tight">U</div>
-        <span class="font-semibold text-sm tracking-tight">UniVote</span>
+  <nav class="fixed top-0 left-0 right-0 h-14 z-50 transition-all duration-500 glass-themed">
+    <div class="max-w-6xl mx-auto px-6 h-full flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <button 
+          onclick={toggleTheme}
+          class="w-8 h-8 bg-stone-900 dark:bg-stone-50 rounded-xl flex items-center justify-center text-white dark:text-stone-950 text-xs font-black shadow-xl hover:shadow-brand-500/20 hover:scale-110 hover:rotate-3 active:scale-90 transition-all duration-300 outline-none"
+          title="Toggle Dark Mode"
+        >
+          U
+        </button>
+        <span class="font-bold text-sm tracking-tight dark:text-white transition-colors duration-500">UniVote</span>
       </div>
-      <a href="/login" class="group flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-900 transition-colors">
-        Staff Portal
-        <svg class="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
-      </a>
     </div>
   </nav>
 
-  <main class="flex-1 max-w-5xl mx-auto px-6">
+  <main class="flex-1 max-w-6xl mx-auto px-6">
 
-    <!-- Hero -->
-    <div class="text-center pt-10 pb-8">
-      <h1 class="text-3xl md:text-4xl leading-[1.1] text-stone-900 mb-4" style="font-family:'Instrument Serif',Georgia,serif" in:fly={{ y: 18, duration: 500, delay: 100 }}>
-        Campus elections,<br/><span class="text-stone-400 text-2xl md:text-3xl">reimagined.</span>
+    <!-- Hero Service -->
+    <div class="pt-24 pb-6 text-center" in:fly={{ y: -20, duration: 800 }}>
+      <h1 class="text-4xl md:text-5xl font-black text-stone-900 dark:text-white leading-[1.05] tracking-tighter mb-4 transition-colors">
+        Campus elections, <br/>
+        <span class="text-stone-500 dark:text-stone-400">reimagined.</span>
       </h1>
-      <p class="text-stone-500 text-sm font-light max-w-sm mx-auto leading-relaxed" in:fly={{ y: 18, duration: 500, delay: 180 }}>
-        Transparent ballot management, real-time results, and secure student access — all in one platform.
+      <p class="text-stone-500 dark:text-stone-400 text-base font-medium max-w-2xl mx-auto leading-relaxed transition-colors px-4">
+        Transparent ballot management, real-time results, and <br class="hidden md:block" />
+        secure student access — all in a professional platform.
       </p>
     </div>
 
     <!-- Cards -->
-    <div class="grid md:grid-cols-2 gap-4 pb-10" in:fly={{ y: 24, duration: 600, delay: 280 }}>
+    <div class="grid md:grid-cols-2 gap-5 pb-12" in:fly={{ y: 24, duration: 800, delay: 200 }}>
 
       <!-- Student -->
       <a href="/student/validate"
-         class="group bg-white border border-stone-200 rounded-2xl p-7 flex flex-col gap-5 hover:border-stone-300 hover:-translate-y-[3px] hover:shadow-[0_12px_40px_-8px_rgba(0,0,0,0.1)] transition-all duration-250">
+         class="group card-themed p-6 flex flex-col gap-5">
         <div class="flex items-start justify-between">
-          <div class="w-10 h-10 bg-stone-900 rounded-xl flex items-center justify-center">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <div class="icon-box-themed w-10 h-10 rounded-2xl bg-stone-950 dark:bg-stone-50 text-white dark:text-stone-950 shadow-xl shadow-black/5 dark:shadow-white/5">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
           </div>
-          <svg class="w-4 h-4 text-stone-300 group-hover:text-stone-700 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M7 7h10v10"/></svg>
+          <div class="w-8 h-8 rounded-full flex items-center justify-center text-stone-300 dark:text-stone-700 bg-stone-50/50 dark:bg-stone-800/50 group-hover:text-stone-950 dark:group-hover:text-white group-hover:translate-x-1 group-hover:-translate-y-1 transition-all duration-500 border border-transparent group-hover:border-stone-200 dark:group-hover:border-stone-700">
+            <svg class="w-4 h-4 font-bold" fill="none" stroke="currentColor" stroke-width="4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M7 7h10v10"/></svg>
+          </div>
         </div>
         <div>
-          <p class="text-[9px] font-semibold text-stone-400 tracking-widest uppercase mb-1.5">For Students</p>
-          <h2 class="text-lg font-semibold text-stone-900 mb-2">Cast Your Vote</h2>
-          <p class="text-stone-500 text-xs leading-relaxed">Verify your Student ID and access the secure ballot in seconds.</p>
+          <p class="text-[9px] font-black text-stone-400 dark:text-stone-500 tracking-[0.2em] uppercase mb-2 transition-colors">For Students</p>
+          <h2 class="text-lg font-bold text-stone-900 dark:text-white mb-1.5 transition-colors">Cast Your Vote</h2>
+          <p class="text-stone-500 dark:text-stone-400 text-xs leading-relaxed transition-colors">Verify your Student ID and access the secure ballot in seconds.</p>
         </div>
-        <div class="border-t border-stone-100 pt-4 flex flex-col gap-1.5">
-          <p class="flex items-center gap-2 text-xs text-stone-500">
-            <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+        <div class="mt-auto border-t border-stone-100 dark:border-stone-800 pt-4 flex flex-col gap-2">
+          <p class="flex items-center gap-2 text-[10px] font-bold text-stone-500 dark:text-stone-400">
+            <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
             Completely anonymous
           </p>
-          <p class="flex items-center gap-2 text-xs text-stone-500">
-            <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-            One vote per student, results in real-time
+          <p class="flex items-center gap-2 text-[10px] font-bold text-stone-500 dark:text-stone-400">
+            <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            One vote per student
           </p>
         </div>
       </a>
 
       <!-- Staff -->
       <a href="/login"
-         class="group bg-stone-900 border border-stone-800 rounded-2xl p-7 flex flex-col gap-5 hover:bg-stone-800 hover:border-stone-700 hover:-translate-y-[3px] hover:shadow-[0_12px_40px_-8px_rgba(0,0,0,0.15)] transition-all duration-250">
+         class="group card-themed p-6 flex flex-col gap-5">
         <div class="flex items-start justify-between">
-          <div class="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <div class="icon-box-themed w-10 h-10 rounded-2xl bg-stone-950 dark:bg-stone-50 text-white dark:text-stone-950 shadow-xl shadow-black/5 dark:shadow-white/5">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75"/>
             </svg>
           </div>
-          <svg class="w-4 h-4 text-stone-600 group-hover:text-stone-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M7 7h10v10"/></svg>
+          <div class="w-8 h-8 rounded-full flex items-center justify-center text-stone-300 dark:text-stone-700 bg-stone-50/50 dark:bg-stone-800/50 group-hover:text-stone-950 dark:group-hover:text-white group-hover:translate-x-1 group-hover:-translate-y-1 transition-all duration-500 border border-transparent group-hover:border-stone-200 dark:group-hover:border-stone-700">
+            <svg class="w-4 h-4 font-bold" fill="none" stroke="currentColor" stroke-width="4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M7 7h10v10"/></svg>
+          </div>
         </div>
         <div>
-          <p class="text-[9px] font-semibold text-stone-500 tracking-widest uppercase mb-1.5">For Staff</p>
-          <h2 class="text-lg font-semibold text-white mb-2">Staff Portal</h2>
-          <p class="text-stone-400 text-xs leading-relaxed">Manage elections, add candidates, and monitor live results.</p>
+          <p class="text-[9px] font-black text-stone-400 dark:text-stone-500 tracking-[0.2em] uppercase mb-2 transition-colors">For Staff</p>
+          <h2 class="text-lg font-bold text-stone-900 dark:text-white mb-1.5 transition-colors">Staff Portal</h2>
+          <p class="text-stone-500 dark:text-stone-400 text-xs leading-relaxed transition-colors">Manage elections, add candidates, and monitor live results.</p>
         </div>
-        <div class="border-t border-stone-800 pt-4 flex flex-col gap-1.5">
-          <p class="flex items-center gap-2 text-xs text-stone-500">
-            <svg class="w-3.5 h-3.5 text-stone-500 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+        <div class="mt-auto border-t border-stone-100 dark:border-stone-800 pt-4 flex flex-col gap-2">
+          <p class="flex items-center gap-2 text-[10px] font-bold text-stone-500 dark:text-stone-400">
+            <svg class="w-3.5 h-3.5 text-brand-500 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
             100% encrypted votes
           </p>
-          <p class="flex items-center gap-2 text-xs text-stone-500">
-            <svg class="w-3.5 h-3.5 text-stone-500 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-            Real-time result tracking
+          <p class="flex items-center gap-2 text-[10px] font-bold text-stone-500 dark:text-stone-400">
+            <svg class="w-3.5 h-3.5 text-brand-500 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            Real-time tracking
           </p>
         </div>
       </a>

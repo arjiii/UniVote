@@ -98,6 +98,9 @@ def delete_candidate(candidate_id: str) -> dict:
 
 
 def get_live_results(election_id: str) -> dict:
+    elec_res = supabase.table("elections").select("status").eq("id", election_id).execute()
+    status = elec_res.data[0]["status"] if elec_res.data else "unknown"
+
     votes_result = (
         supabase.table("votes")
         .select("position, candidate_id")
@@ -105,11 +108,14 @@ def get_live_results(election_id: str) -> dict:
         .execute()
     )
 
-    results: dict = {}
+    tallies: dict = {}
     for vote in votes_result.data:
         pos = vote["position"]
         cid = vote["candidate_id"]
-        results.setdefault(pos, {})
-        results[pos][cid] = results[pos].get(cid, 0) + 1
+        tallies.setdefault(pos, {})
+        tallies[pos][cid] = tallies.get(pos, {}).get(cid, 0) + 1
 
-    return results
+    return {
+        "status": status,
+        "tallies": tallies
+    }

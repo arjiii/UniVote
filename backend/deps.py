@@ -7,11 +7,22 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dataclasses import dataclass
 from database import supabase
 import jwt
+from datetime import datetime, timedelta
 
 bearer_scheme = HTTPBearer()
 
 SECRET_KEY = "UNIVOTE_SUPER_SECRET_KEY_DEV_ONLY"
 ALGORITHM = "HS256"
+
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
 @dataclass
 class AuthUser:

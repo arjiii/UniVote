@@ -99,7 +99,7 @@ def register(body: RegisterRequest):
 
     return {"message": f"{body.role.capitalize()} registered successfully. Please log in."}
 
-from deps import get_current_user, AuthUser, Depends
+from deps import get_current_user, AuthUser, Depends, create_access_token
 
 @router.get("/me")
 def get_me(user: AuthUser = Depends(get_current_user)):

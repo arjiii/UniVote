@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from routes import admin, adviser, student, auth as auth_router
+from routes import admin, adviser, student, auth as auth_router, results as results_router
 
 app = FastAPI(title="UniVote API")
 
@@ -34,9 +34,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Type"],
 )
 
 # Public: no auth required
+app.include_router(results_router.router, prefix="/api/results", tags=["results"])
+
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
 
 # Student voting: validated by student_id only (no account required)

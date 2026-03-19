@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { auth as authApi } from '$lib/api.js';
   import { authSession } from '$lib/stores/auth.js';
+  import { theme, toggleTheme } from '$lib/stores/theme.js';
   import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
   import { fade, fly } from 'svelte/transition';
 
@@ -73,79 +74,80 @@
   <title>Register | UniVote Staff Portal</title>
 </svelte:head>
 
-<div class="min-h-screen flex bg-slate-50">
+<div class="min-h-screen flex bg-stone-50 dark:bg-stone-950 transition-colors duration-500" class:dark={$theme === 'dark'}>
   <!-- Left Branding Panel -->
-  <div class="hidden lg:flex flex-col justify-between w-[45%] bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-700 p-12 relative overflow-hidden">
-    <div class="absolute inset-0 opacity-10">
-      <div class="absolute -top-20 -left-20 w-80 h-80 rounded-full border-[50px] border-white"></div>
-      <div class="absolute bottom-0 right-0 w-96 h-96 rounded-full border-[60px] border-white"></div>
+  <div class="hidden lg:flex w-[44%] flex-col justify-between bg-stone-100 dark:bg-stone-900 border-r border-stone-200 dark:border-stone-800 p-10 relative overflow-hidden flex-shrink-0">
+    <!-- Decorative circles -->
+    <div class="absolute -top-32 -left-32 w-80 h-80 rounded-full border-[40px] border-stone-200/50 dark:border-stone-800/50 pointer-events-none"></div>
+    <div class="absolute -top-16 -left-16 w-48 h-48 rounded-full border-[20px] border-stone-300/30 dark:border-stone-700/30 pointer-events-none"></div>
+
+    <div class="relative flex items-center gap-3">
+      <button 
+        onclick={toggleTheme}
+        class="w-8 h-8 bg-stone-950 dark:bg-stone-50 rounded-xl flex items-center justify-center text-white dark:text-stone-950 text-xs font-black shadow-xl hover:shadow-brand-500/20 hover:scale-110 hover:rotate-3 active:scale-95 transition-all duration-300 outline-none"
+      >
+        U
+      </button>
+      <span class="font-bold text-sm tracking-tight dark:text-white transition-colors">UniVote</span>
     </div>
 
-    <div class="relative z-10 flex items-center gap-3">
-      <a href="/" class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center border border-white/30">
-          <span class="text-white font-black text-lg">U</span>
-        </div>
-        <span class="text-white font-bold text-xl tracking-tight">UniVote</span>
-      </a>
-    </div>
-
-    <div class="relative z-10">
-      <h1 class="text-4xl font-black text-white leading-tight mb-4">
-        Join the<br/>UniVote team.
+    <div class="relative">
+      <h1 class="text-4xl font-black text-stone-950 dark:text-white leading-[1.1] mb-6 tracking-tighter transition-colors">
+        Join the<br/><span class="text-stone-500">UniVote team.</span>
       </h1>
-      <p class="text-white/70 text-sm leading-relaxed max-w-xs mb-10">
+      <p class="text-stone-500 dark:text-stone-400 text-sm leading-relaxed max-w-xs mb-10 font-medium transition-colors">
         Register as an Admin or Adviser to manage elections, candidates, and results.
       </p>
 
       <div class="space-y-4">
         {#each ['Manage Elections End-to-End', 'Import & Oversee Student Voters', 'Monitor Results in Real-time', 'Full Activity Audit Trail'] as feature}
-          <div class="flex items-center gap-3 text-white/90 text-sm">
-            <div class="w-6 h-6 rounded-full bg-white/20 border border-white/30 flex items-center justify-center shrink-0">
-              <svg class="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          <div class="flex items-center gap-3 group">
+            <div class="w-6 h-6 bg-stone-200 dark:bg-stone-800 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+              <svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" stroke-width="4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
             </div>
-            <span class="font-medium">{feature}</span>
+            <span class="text-sm font-bold text-stone-700 dark:text-stone-300 transition-colors">{feature}</span>
           </div>
         {/each}
       </div>
     </div>
 
-    <p class="relative z-10 text-white/40 text-xs">© 2025 UniVote. All rights reserved.</p>
+    <p class="relative text-stone-400 dark:text-stone-600 text-[10px] font-bold uppercase tracking-widest">© 2025 UniVote. All rights reserved.</p>
   </div>
 
   <!-- Right Registration Panel -->
   <div class="flex-1 flex flex-col items-center justify-center p-8 overflow-y-auto" in:fade={{ duration: 500 }}>
     <div class="w-full max-w-md py-8">
       <!-- Mobile logo -->
-      <div class="lg:hidden flex items-center gap-2 mb-8">
-        <a href="/" class="flex items-center gap-2">
-          <div class="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center">
-            <span class="text-white font-black">U</span>
-          </div>
-          <span class="font-bold text-slate-900 text-lg">UniVote</span>
-        </a>
+      <div class="lg:hidden flex items-center gap-3 mb-10">
+        <button 
+          onclick={toggleTheme}
+          class="w-9 h-9 bg-stone-900 dark:bg-stone-50 rounded-xl flex items-center justify-center text-white dark:text-stone-950 text-base font-black shadow-xl hover:scale-110 active:scale-95 transition-all outline-none"
+        >
+          U
+        </button>
+        <span class="font-bold text-stone-950 dark:text-white text-lg transition-colors">UniVote</span>
       </div>
 
       <div in:fly={{ y: 20, duration: 500, delay: 100 }}>
-        <h2 class="text-2xl font-black text-slate-900 tracking-tight">Create account</h2>
-        <p class="text-slate-500 text-sm mt-1.5 font-medium">Request staff access to the UniVote portal</p>
+        <h2 class="text-3xl font-black text-stone-950 dark:text-white tracking-tighter transition-colors">Create account</h2>
+        <p class="text-stone-500 dark:text-stone-400 text-sm mt-1.5 font-medium transition-colors">Request staff access to the UniVote portal</p>
       </div>
 
       <!-- Role Switch -->
-      <div class="mt-6 flex gap-2 p-1.5 bg-slate-100 rounded-xl border border-slate-200" in:fly={{ y: 20, duration: 500, delay: 150 }}>
+      <div class="mt-6 flex gap-2 p-1.5 bg-stone-100 dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 transition-colors" in:fly={{ y: 20, duration: 500, delay: 150 }}>
         <button 
           type="button" 
           onclick={() => role = 'adviser'}
-          class="flex-1 py-2 text-sm font-semibold rounded-lg transition-all duration-200 {role === 'adviser' ? 'bg-white text-indigo-700 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-800'}"
+          class="flex-1 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 {role === 'adviser' ? 'bg-white dark:bg-stone-800 text-stone-950 dark:text-white shadow-xl shadow-black/5' : 'text-stone-400 hover:text-stone-600'}"
         >
           Adviser
         </button>
         <button 
           type="button" 
           onclick={() => role = 'admin'}
-          class="flex-1 py-2 text-sm font-semibold rounded-lg transition-all duration-200 {role === 'admin' ? 'bg-white text-indigo-700 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-800'}"
+          class="flex-1 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 {role === 'admin' ? 'bg-white dark:bg-stone-800 text-stone-950 dark:text-white shadow-xl shadow-black/5' : 'text-stone-400 hover:text-stone-600'}"
         >
-          Administrator
+          Admin
         </button>
       </div>
 
@@ -218,12 +220,17 @@
           </div>
         {/if}
 
-        <button type="submit" disabled={isSubmitting || !!successMessage} class="btn-primary">
+        <button 
+          type="submit" 
+          disabled={isSubmitting || !!successMessage}
+          class="btn-premium w-full py-4 text-sm font-black shadow-2xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
           {#if isSubmitting}
             <LoadingSpinner />
             <span>Creating Account...</span>
           {:else}
-            Complete Registration
+            <span>Complete Registration</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
           {/if}
         </button>
       </form>

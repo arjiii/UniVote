@@ -1,11 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from models import StudentAuth, VoteSubmit
-from services import student_service
+from services import student_service, adviser_service
+from deps import CurrentStudent, StudentUser
 
 router = APIRouter()
 
-
-from deps import CurrentStudent, StudentUser
 
 @router.post("/validate")
 def validate_student(auth: StudentAuth):
@@ -60,5 +59,4 @@ def get_vote_summary(student_id: str, election_id: str, student: StudentUser = C
 @router.get("/results")
 def get_results(election_id: str):
     # Results are usually public for students once the election is active/completed
-    from services import adviser_service
     return {"data": adviser_service.get_live_results(election_id)}

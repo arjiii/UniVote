@@ -1,15 +1,14 @@
-from fastapi import APIRouter, UploadFile, File, Depends, Body
+from fastapi import APIRouter, UploadFile, File, Depends, Body, HTTPException
 from models import ElectionCreate, ElectionStatusUpdate, StudentManualCreate
-from services import election_service
-from services import audit_service
-from deps import require_admin, AuthUser
+from services import election_service, audit_service
+from deps import require_admin, require_adviser, AuthUser
+from database import supabase
+from passlib.hash import argon2
 import csv
 from io import StringIO
 
 router = APIRouter()
 
-
-from deps import require_admin, require_adviser, AuthUser
 
 @router.get("/elections")
 def get_elections(user: AuthUser = Depends(require_adviser)):
@@ -68,8 +67,6 @@ def delete_election(
 @router.get("/students")
 def get_students(user: AuthUser = Depends(require_admin)):
     """Retrieve all students (voter list)."""
-    # Simply using supabase directly for this list
-    from database import supabase
     res = supabase.table("students").select("*").order("full_name").execute()
     return {"data": res.data}
 
@@ -106,7 +103,6 @@ def delete_student(
 # Adviser Management
 @router.get("/advisers")
 def get_advisers(user: AuthUser = Depends(require_admin)):
-    from database import supabase
     res = supabase.table("advisers").select("id, full_name, email, department, created_at").execute()
     return {"data": res.data}
 
@@ -116,8 +112,6 @@ def create_adviser(
     payload: dict = Body(...),
     user: AuthUser = Depends(require_admin),
 ):
-    from database import supabase
-    from passlib.hash import argon2
     
     email = payload.get("email")
     password = payload.get("password")
@@ -153,7 +147,6 @@ def delete_adviser(
     adviser_id: str,
     user: AuthUser = Depends(require_admin),
 ):
-    from database import supabase
     # Note: deleting an adviser won't delete their created partylists/candidates 
     # unless we want to cascade that too. For now just delete the user.
     res = supabase.table("advisers").delete().eq("id", adviser_id).execute()
