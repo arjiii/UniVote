@@ -1,32 +1,23 @@
-from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel
-from database import supabase
+from fastapi import APIRouter, HTTPException, status, Depends, Request
+from database import get_async_supabase
 from passlib.hash import argon2
-import jwt
 from datetime import datetime, timedelta
+from deps import create_access_token, get_current_user, AuthUser
+from models import LoginRequest, RegisterRequest
+from limiter import limiter
 
 router = APIRouter()
 
-from deps import create_access_token
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-
-class RegisterRequest(BaseModel):
-    email: str
-    password: str
-    full_name: str
-    role: str  # 'admin' or 'adviser'
-    department: str | None = None  # for adviser only
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 day
 
 @router.post("/login")
-def login(body: LoginRequest):
+@limiter.limit("5/minute")
+async def login(request: Request, body: LoginRequest):
     """Sign in via the custom admins/advisers tables using Argon2 and return PyJWT."""
     # Check admins first
-    admin_check = supabase.table("admins").select("id, full_name, password_hash").eq("email", body.email).execute()
+    supabase = await get_async_supabase()
+    admin_check = await supabase.table("admins").select("id, full_name, password_hash").eq("id_number", body.username).execute()
     user = None
     role = None
     
@@ -35,7 +26,7 @@ def login(body: LoginRequest):
         role = "admin"
     else:
         # Check advisers next
-        adviser_check = supabase.table("advisers").select("id, full_name, password_hash").eq("email", body.email).execute()
+        adviser_check = await supabase.table("advisers").select("id, full_name, password_hash").eq("id_number", body.username).execute()
         if adviser_check.data:
             user = adviser_check.data[0]
             role = "adviser"
@@ -63,7 +54,8 @@ def login(body: LoginRequest):
     }
 
 @router.post("/register")
-def register(body: RegisterRequest):
+@limiter.limit("3/hour")
+async def register(request: Request, body: RegisterRequest):
     """Create a raw database account using Argon2 hashing."""
     if body.role not in ("admin", "adviser"):
         raise HTTPException(status_code=400, detail="Role must be 'admin' or 'adviser'.")
@@ -73,20 +65,21 @@ def register(body: RegisterRequest):
 
     # Check if email exists in either table to prevent duplicates
     try:
-        admin_exists = supabase.table("admins").select("id").eq("email", body.email).execute()
-        adviser_exists = supabase.table("advisers").select("id").eq("email", body.email).execute()
+        supabase = await get_async_supabase()
+        admin_exists = await supabase.table("admins").select("id").eq("id_number", body.username).execute()
+        adviser_exists = await supabase.table("advisers").select("id").eq("id_number", body.username).execute()
         
         if admin_exists.data or adviser_exists.data:
-            raise HTTPException(status_code=400, detail="Email already registered.")
+            raise HTTPException(status_code=400, detail="ID Number already registered.")
 
         if body.role == "admin":
-            payload = {"email": body.email, "full_name": body.full_name, "password_hash": hashed_password}
-            res = supabase.table("admins").insert(payload).execute()
+            payload = {"id_number": body.username, "full_name": body.full_name, "password_hash": hashed_password, "email": f"{body.username}@univote.temp"}
+            res = await supabase.table("admins").insert(payload).execute()
         else:
-            payload = {"email": body.email, "full_name": body.full_name, "password_hash": hashed_password}
+            payload = {"id_number": body.username, "full_name": body.full_name, "password_hash": hashed_password, "email": f"{body.username}@univote.temp"}
             if body.department:
                 payload["department"] = body.department
-            res = supabase.table("advisers").insert(payload).execute()
+            res = await supabase.table("advisers").insert(payload).execute()
             
         if not res.data:
             raise Exception("Failed to insert user into database.")
@@ -99,16 +92,15 @@ def register(body: RegisterRequest):
 
     return {"message": f"{body.role.capitalize()} registered successfully. Please log in."}
 
-from deps import get_current_user, AuthUser, Depends, create_access_token
-
 @router.get("/me")
-def get_me(user: AuthUser = Depends(get_current_user)):
+async def get_me(user: AuthUser = Depends(get_current_user)):
     """Retrieve user details for frontend validation using JWT."""
-    admin = supabase.table("admins").select("id, full_name, email").eq("id", user.id).execute()
+    supabase = await get_async_supabase()
+    admin = await supabase.table("admins").select("id, full_name, email").eq("id", user.id).execute()
     if admin.data:
         return {"role": "admin", "full_name": admin.data[0]["full_name"], "email": admin.data[0]["email"]}
         
-    adviser = supabase.table("advisers").select("id, full_name, email, department").eq("id", user.id).execute()
+    adviser = await supabase.table("advisers").select("id, full_name, email, department").eq("id", user.id).execute()
     if adviser.data:
         return {"role": "adviser", **adviser.data[0]}
         

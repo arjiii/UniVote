@@ -4,16 +4,12 @@
   import { auth as authApi } from '$lib/api.js';
   import { authSession } from '$lib/stores/auth.js';
   import { theme, toggleTheme } from '$lib/stores/theme.js';
-  import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
-  import { fade, fly } from 'svelte/transition';
 
   onMount(() => {
-    if ($authSession) {
-      goto($authSession.role === 'admin' ? '/admin' : '/adviser');
-    }
+    if ($authSession) goto($authSession.role === 'admin' ? '/admin' : '/adviser');
   });
 
-  let email = $state('');
+  let id = $state('');
   let password = $state('');
   let showPassword = $state(false);
   let isSubmitting = $state(false);
@@ -21,171 +17,150 @@
 
   async function handleLogin(/** @type {SubmitEvent} */ e) {
     e.preventDefault();
-    if (!email || !password) {
-      errorMessage = 'Please enter both email and password.';
-      return;
-    }
-
+    if (!id || !password) { errorMessage = 'Please enter both ID and password.'; return; }
     isSubmitting = true;
     errorMessage = '';
-
     try {
-      const data = await authApi.login(email, password);
+      const data = await authApi.login(id, password);
       authSession.login(data);
       goto(data.role === 'admin' ? '/admin' : '/adviser');
     } catch (/** @type {any} */ err) {
       errorMessage = err.message ?? 'Sign in failed. Please check your credentials.';
-    } finally {
-      isSubmitting = false;
-    }
+    } finally { isSubmitting = false; }
   }
 </script>
 
-<svelte:head>
-  <title>Sign In | UniVote Staff Portal</title>
-</svelte:head>
+<svelte:head><title>Sign In | UniVote</title></svelte:head>
 
-<div class="min-h-screen flex bg-stone-50 dark:bg-stone-950 transition-colors duration-500" class:dark={$theme === 'dark'}>
+<div class="login-page" class:dark={$theme === 'dark'}>
 
-  <!-- Left panel: brand + trust signals -->
-  <div class="hidden lg:flex w-[44%] flex-col justify-between bg-stone-900 border-r border-stone-800 p-10 relative overflow-hidden flex-shrink-0">
-    <!-- Decorative circles -->
-    <div class="absolute -top-32 -left-32 w-80 h-80 rounded-full border-[40px] border-stone-800/50 pointer-events-none"></div>
-    <div class="absolute -top-16 -left-16 w-48 h-48 rounded-full border-[20px] border-stone-700/30 pointer-events-none"></div>
-
-    <div class="relative flex items-center gap-3">
-      <button 
-        onclick={toggleTheme}
-        class="w-8 h-8 bg-stone-50 rounded-xl flex items-center justify-center text-stone-950 text-xs font-black shadow-xl hover:shadow-brand-500/20 hover:scale-110 hover:rotate-3 active:scale-95 transition-all duration-300 outline-none"
-      >
-        U
-      </button>
-      <span class="font-bold text-sm tracking-tight text-white">UniVote</span>
+  <!-- Topbar -->
+  <nav class="login-topbar">
+    <div style="display:flex;align-items:center;gap:0.5rem;">
+      <button onclick={toggleTheme} class="login-logo" title="Toggle theme">U</button>
+      <span style="font-size:0.9375rem;font-weight:700;color:var(--text-main);">UniVote</span>
     </div>
+    <a href="/" style="font-size:0.75rem;color:var(--text-subtle);text-decoration:none;display:flex;align-items:center;gap:0.25rem;">
+      <svg style="width:0.875rem;height:0.875rem;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+      Back to home
+    </a>
+  </nav>
 
-    <div class="relative">
-      <div class="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-3 py-1 mb-8">
-        <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full block animate-pulse"></span>
-        <span class="text-[10px] text-white/50 font-bold uppercase tracking-widest">Secure E-Voting</span>
-      </div>
-      <h2 class="text-4xl text-white leading-[1.1] mb-6 font-black tracking-tighter">
-        The future of<br/><span class="text-stone-400">campus elections.</span>
-      </h2>
-      <p class="text-stone-400 text-sm leading-relaxed max-w-xs font-medium">
-        Transparent, secure, and accessible digital voting for your university community.
-      </p>
+  <!-- Form wrapper -->
+  <div class="login-body">
+    <div class="login-card admin-card">
 
-      <div class="grid grid-cols-2 gap-4 mt-10">
-        <div class="bg-white/5 border border-white/5 rounded-2xl p-5 backdrop-blur-sm">
-          <p class="text-white text-2xl font-black mb-1">100%</p>
-          <p class="text-stone-500 text-[10px] font-bold uppercase tracking-wider">Encrypted</p>
-        </div>
-        <div class="bg-white/5 border border-white/5 rounded-2xl p-5 backdrop-blur-sm">
-          <p class="text-white text-2xl font-black mb-1">Live</p>
-          <p class="text-stone-500 text-[10px] font-bold uppercase tracking-wider">Tracking</p>
-        </div>
-      </div>
-    </div>
-
-    <p class="relative text-stone-600 text-[10px] font-bold uppercase tracking-widest">© 2025 UniVote. All rights reserved.</p>
-  </div>
-
-  <!-- Right form panel -->
-  <div class="flex-1 flex items-center justify-center px-6 py-12" in:fade={{ duration: 400 }}>
-    <div class="w-full max-w-sm">
-
-      <!-- Mobile logo -->
-      <div class="lg:hidden flex items-center gap-3 mb-10">
-        <button 
-          onclick={toggleTheme}
-          class="w-8 h-8 bg-stone-900 dark:bg-stone-50 rounded-xl flex items-center justify-center text-white dark:text-stone-950 text-xs font-black shadow-xl hover:scale-110 active:scale-95 transition-all outline-none"
-        >
-          U
-        </button>
-        <span class="font-bold text-sm dark:text-white transition-colors">UniVote</span>
+      <div style="margin-bottom:1.5rem;">
+        <h1 style="font-size:1.25rem;font-weight:700;color:var(--text-main);">Staff Sign In</h1>
+        <p style="font-size:0.8125rem;color:var(--text-muted);margin-top:0.25rem;">Enter your credentials to access the administration portal.</p>
       </div>
 
-      <div in:fly={{ y: 14, duration: 400, delay: 50 }}>
-        <h1 class="text-3xl font-black text-stone-950 dark:text-white mb-2 tracking-tighter transition-colors">Welcome back</h1>
-        <p class="text-stone-500 dark:text-stone-400 text-sm font-medium transition-colors">Sign in to your staff portal</p>
-      </div>
-
-      <form onsubmit={handleLogin} class="mt-8 space-y-4" in:fly={{ y: 14, duration: 400, delay: 120 }}>
-
-        <!-- Email -->
+      <form onsubmit={handleLogin} style="display:flex;flex-direction:column;gap:1rem;">
         <div>
-          <label for="email" class="block text-xs font-semibold text-stone-500 dark:text-stone-400 tracking-wide uppercase mb-1.5">Email Address</label>
-          <input 
-            type="email" 
-            id="email" 
-            bind:value={email} 
-            placeholder="admin@univote.edu"
+          <label class="field-label" for="id">Staff / Employee ID</label>
+          <input
+            type="text"
+            id="id"
             class="input-base"
+            bind:value={id}
+            placeholder="e.g. 2024-001"
+            autocomplete="username"
             required
-          >
+          />
         </div>
 
-        <!-- Password -->
         <div>
-          <label for="password" class="block text-xs font-semibold text-stone-500 dark:text-stone-400 tracking-wide uppercase mb-1.5">Password</label>
-          <div class="relative">
-            <input 
+          <label class="field-label" for="password">Password</label>
+          <div style="position:relative;">
+            <input
               type={showPassword ? 'text' : 'password'}
-              id="password" 
-              bind:value={password} 
+              id="password"
+              class="input-base"
+              bind:value={password}
               placeholder="••••••••"
-              class="input-base pr-12"
+              autocomplete="current-password"
+              style="padding-right:2.5rem;"
               required
-            >
-            <button 
-              type="button" 
+            />
+            <button
+              type="button"
               onclick={() => showPassword = !showPassword}
-              class="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
+              class="btn-icon"
+              style="position:absolute;right:0.375rem;top:50%;transform:translateY(-50%);"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
               {#if showPassword}
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/></svg>
               {:else}
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
               {/if}
             </button>
           </div>
         </div>
 
-        <!-- Error -->
         {#if errorMessage}
-          <div class="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-2" in:fly={{ y: -5, duration: 200 }}>
-            <svg class="w-4 h-4 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
-            <p class="text-red-600 text-xs font-medium">{errorMessage}</p>
+          <div style="padding:0.625rem 0.75rem;background-color:var(--status-danger-bg);border:1px solid rgba(220,38,38,0.2);border-radius:6px;font-size:0.75rem;color:var(--status-danger-fg);font-weight:500;">
+            {errorMessage}
           </div>
         {/if}
 
-        <!-- Submit -->
-        <div class="pt-1">
-          <button 
-            type="submit" 
-            disabled={isSubmitting}
-            class="btn-premium w-full py-4 text-sm font-black shadow-2xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 relative overflow-hidden"
-          >
-            {#if isSubmitting}
-              <LoadingSpinner />
-              <span>Signing in...</span>
-            {:else}
-              <span>Sign In</span>
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
-            {/if}
-          </button>
-        </div>
+        <button type="submit" disabled={isSubmitting} class="btn-primary" style="width:100%;margin-top:0.25rem;padding:0.625rem 1rem;font-size:0.875rem;">
+          {#if isSubmitting}
+            <div class="spinner" style="width:1rem;height:1rem;border-width:2px;border-top-color:#fff;"></div>
+            Signing in…
+          {:else}
+            Sign In
+          {/if}
+        </button>
       </form>
 
-      <div class="mt-6 pt-6 border-t border-stone-200 dark:border-stone-700 text-center space-y-3" in:fly={{ y: 14, duration: 400, delay: 200 }}>
-        <p class="text-xs text-stone-500 dark:text-stone-400">
-          Need portal access? <a href="/register" class="text-stone-900 dark:text-white font-medium hover:underline">Request Account</a>
+      <div style="margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid var(--border-main);display:flex;align-items:center;justify-content:space-between;">
+        <p style="font-size:0.75rem;color:var(--text-muted);">
+          No account?
+          <a href="/register" style="color:var(--brand-primary);text-decoration:none;font-weight:500;">Register here</a>
         </p>
-        <a href="/" class="inline-flex items-center gap-1 text-xs text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 19l-7-7 7-7"/></svg>
-          Back to home
-        </a>
+        <a href="/student/validate" style="font-size:0.75rem;color:var(--text-subtle);text-decoration:none;">Student login →</a>
       </div>
     </div>
   </div>
 </div>
+
+<style>
+  :global(body) { background-color: var(--bg-main); }
+
+  .login-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-main);
+  }
+  .login-topbar {
+    height: 52px;
+    background-color: var(--bg-card);
+    border-bottom: 1px solid var(--border-main);
+    padding: 0 1.5rem;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .login-logo {
+    width: 28px; height: 28px;
+    background-color: var(--brand-primary); color: #fff;
+    border-radius: 6px; font-size: 0.75rem; font-weight: 800;
+    border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background-color 0.15s;
+  }
+  .login-logo:hover { background-color: var(--brand-primary-h); }
+
+  .login-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.5rem;
+  }
+  .login-card {
+    width: 100%;
+    max-width: 380px;
+    padding: 1.75rem;
+  }
+</style>

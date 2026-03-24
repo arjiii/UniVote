@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { admin, adviser } from '$lib/api.js';
-	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
+	import GlassCard from '$lib/components/GlassCard.svelte';
 	import { selectedElectionId } from '$lib/stores/election.js';
 
 	/** @type {any[]} */
@@ -93,124 +93,93 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Partylist Configuration | UniVote</title>
-</svelte:head>
+<svelte:head><title>Partylist Configuration | UniVote</title></svelte:head>
 
-<div class="max-w-5xl mx-auto px-5 md:px-8 py-8 space-y-6">
-	<!-- Header -->
-	<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-		<div>
-			<p class="text-[10px] font-semibold text-stone-400 dark:text-stone-500 tracking-widest uppercase mb-1">Adviser</p>
-			<h1 class="text-2xl font-semibold text-stone-900 dark:text-white">Partylists</h1>
-			<p class="text-stone-500 dark:text-stone-400 text-sm mt-0.5">Configure political organizations for the selected election.</p>
-		</div>
-
-		<div class="flex items-center gap-3 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl px-4 py-2.5 w-fit">
-			<label for="election-select" class="text-[10px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-widest whitespace-nowrap">Election</label>
+<GlassCard title="Partylists" subtitle="Election Configuration">
+	{#snippet headerExtra()}
+		<div style="display:flex;align-items:center;gap:0.75rem;">
+			<label for="election-select" class="field-label" style="margin-bottom:0;line-height:1;">Election</label>
 			<select 
 				id="election-select"
 				bind:value={$selectedElectionId}
-				class="bg-transparent border-none text-sm font-semibold text-stone-900 dark:text-white focus:outline-none cursor-pointer min-w-[180px]"
+				class="input-base"
+				style="width:220px;padding:0.375rem 0.75rem;font-size:0.8125rem;"
 			>
-				<option value="" disabled>Select election</option>
+				<option value="" disabled>Select Election...</option>
 				{#each elections as election}
 					<option value={election.id}>{election.name}</option>
 				{/each}
 			</select>
 		</div>
-	</div>
+	{/snippet}
 
 	{#if !$selectedElectionId}
-		<div class="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-stone-200 dark:border-stone-700 rounded-2xl">
-			<div class="w-14 h-14 bg-stone-100 dark:bg-stone-800 rounded-2xl flex items-center justify-center mb-4">
-				<svg class="w-7 h-7 text-stone-400 dark:text-stone-500" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-			</div>
-			<h2 class="font-semibold text-stone-900 dark:text-white mb-1">No Election Selected</h2>
-			<p class="text-stone-400 dark:text-stone-500 text-sm max-w-xs">Select an election from the dropdown above to manage partylists.</p>
-		</div>
+		<div class="empty-state">Please select an election from the dropdown above to manage its partylists.</div>
 	{:else}
-		<div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+		<div class="bento-grid" style="grid-template-columns: 1fr 2.5fr; gap: 1rem;">
 			<!-- Form -->
-			<div class="lg:col-span-4">
-				<div class="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-700 p-6 sticky top-6">
-					<div class="flex items-center gap-3 mb-5">
-						<div class="w-9 h-9 bg-stone-100 dark:bg-stone-800 rounded-xl flex items-center justify-center">
-							<svg class="w-4 h-4 text-stone-600 dark:text-stone-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
-						</div>
-						<h2 class="text-sm font-semibold text-stone-900 dark:text-white">Add Partylist</h2>
+			<div class="admin-card" style="padding:1.25rem;height:fit-content;">
+				<div style="margin-bottom:1.25rem;">
+					<h2 style="font-size:0.875rem;font-weight:600;color:var(--text-main);">Add Partylist</h2>
+				</div>
+
+				<form onsubmit={handleAddPartylist} style="display:flex;flex-direction:column;gap:1rem;">
+					<div>
+						<label class="field-label" for="party-name">Partylist Name</label>
+						<input id="party-name" type="text" bind:value={newPartylist} class="input-base" placeholder="e.g. Student Forward" />
 					</div>
 
-					<form onsubmit={handleAddPartylist} class="space-y-4">
-						<div>
-							<label class="block text-xs font-semibold text-stone-500 dark:text-stone-400 tracking-wide uppercase mb-1.5" for="party-name">Name</label>
-							<input id="party-name" type="text" bind:value={newPartylist} placeholder="e.g. Student Forward" class="input-base"/>
-						</div>
+					{#if errorMessage}
+						<div style="color:var(--status-danger-fg);font-size:0.75rem;padding:0.5rem;background:var(--status-danger-bg);border-radius:4px;">{errorMessage}</div>
+					{/if}
+					{#if successMessage}
+						<div style="color:var(--status-success-fg);font-size:0.75rem;padding:0.5rem;background:var(--status-success-bg);border-radius:4px;">{successMessage}</div>
+					{/if}
 
-						{#if errorMessage}
-							<div class="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2">
-								<svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
-								{errorMessage}
-							</div>
-						{/if}
-
-						{#if successMessage}
-							<div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold flex items-center gap-2">
-								<svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-								{successMessage}
-							</div>
-						{/if}
-
-						<button type="submit" disabled={isSubmitting || !isModifiable()} class="w-full rounded-xl py-2.5 text-sm font-semibold hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2" style="background-color: var(--text-main); color: var(--bg-main);">
-							{#if isSubmitting} <LoadingSpinner /> Adding... {:else} Save Partylist {/if}
-						</button>
-					</form>
-				</div>
+					<button type="submit" disabled={isSubmitting || !isModifiable()} class="btn-primary" style="margin-top:0.5rem;">
+						{isSubmitting ? 'Adding...' : 'Add Partylist'}
+					</button>
+				</form>
 			</div>
 
 			<!-- List -->
-			<div class="lg:col-span-8 space-y-5">
-				<div class="flex items-center justify-between">
-				<h2 class="text-sm font-semibold text-stone-900 dark:text-white">Organizations</h2>
-					<span class="text-xs font-semibold text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-stone-800 px-3 py-1 rounded-lg">{partylists.length} registered</span>
+			<div class="admin-card" style="overflow:hidden;">
+				<div style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-main);">
+					<h2 style="font-size:0.875rem;font-weight:600;color:var(--text-main);">{partylists.length} Partylist{partylists.length !== 1 ? 's' : ''}</h2>
 				</div>
 
 				{#if partylists.length === 0}
-					<div class="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-stone-200 dark:border-stone-700 rounded-2xl">
-						<div class="w-12 h-12 bg-stone-100 dark:bg-stone-800 rounded-2xl flex items-center justify-center mb-3">
-							<svg class="w-6 h-6 text-stone-300 dark:text-stone-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-						</div>
-						<p class="font-semibold text-stone-600 dark:text-stone-300 text-sm">No partylists yet</p>
-					</div>
+					<div class="empty-state" style="border:none;border-radius:0;">No partylists added for this election yet.</div>
 				{:else}
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+					<div class="bento-grid bento-2col" style="padding:1rem;gap:1rem;">
 						{#each partylists as party}
-							<div class="group bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-700 p-5 hover:border-stone-400 dark:hover:border-stone-500 transition-all relative">
+							<div style="border:1px solid var(--border-main);border-radius:6px;padding:1rem;display:flex;flex-direction:column;gap:0.75rem;">
 								{#if editingPartylistId === party.id}
-									<div class="space-y-3">
-										<input 
-											type="text" 
-											bind:value={editingPartylistName}
-											class="input-base !py-2"
-											onkeydown={(e) => e.key === 'Enter' && handleUpdatePartylist()}
-										/>
-										<div class="flex gap-2">
-											<button onclick={handleUpdatePartylist} class="flex-1 rounded-lg py-1.5 text-xs font-semibold hover:opacity-90 transition-all" style="background-color: var(--text-main); color: var(--bg-main);">Save</button>
-											<button onclick={() => editingPartylistId = null} class="flex-1 bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-lg py-1.5 text-xs font-semibold">Cancel</button>
-										</div>
+									<input 
+										type="text" 
+										bind:value={editingPartylistName}
+										class="input-base"
+										onkeydown={(e) => e.key === 'Enter' && handleUpdatePartylist()}
+									/>
+									<div style="display:flex;gap:0.5rem;">
+										<button onclick={handleUpdatePartylist} class="btn-primary btn-sm flex-1">Save</button>
+										<button onclick={() => editingPartylistId = null} class="btn-secondary btn-sm flex-1">Cancel</button>
 									</div>
 								{:else}
-									<div class="flex items-center justify-between mb-3">
-										<div class="w-8 h-8 bg-stone-100 dark:bg-stone-800 rounded-lg flex items-center justify-center font-bold text-stone-600 dark:text-stone-300 text-xs">
-											{party.name.substring(0,1).toUpperCase()}
-										</div>
-										<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-											<button onclick={() => startEditPartylist(party)} class="p-1.5 text-stone-400 hover:text-stone-900 dark:hover:text-white hover:bg-stone-50 dark:hover:bg-stone-700 rounded-lg transition-all" title="Rename"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
-											<button onclick={() => handleDeletePartylist(party.id)} class="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all" title="Delete"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+									<div style="display:flex;align-items:flex-start;justify-content:space-between;">
+										<h3 style="font-weight:600;font-size:0.875rem;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title={party.name}>{party.name}</h3>
+										<div style="display:flex;gap:0.25rem;">
+											{#if isModifiable()}
+												<button onclick={() => startEditPartylist(party)} class="btn-icon-edit" title="Edit">
+													<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"/></svg>
+												</button>
+												<button onclick={() => handleDeletePartylist(party.id)} class="btn-icon-danger" title="Delete">
+													<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+												</button>
+											{/if}
 										</div>
 									</div>
-									<h3 class="font-semibold text-stone-900 dark:text-white truncate">{party.name}</h3>
-									<p class="text-[10px] font-mono text-stone-400 dark:text-stone-500 mt-1">ID: {party.id.substring(0,8)}</p>
+									<p style="font-size:0.6875rem;color:var(--text-subtle);font-family:monospace;">ID: {party.id.substring(0,8)}</p>
 								{/if}
 							</div>
 						{/each}
@@ -219,5 +188,4 @@
 			</div>
 		</div>
 	{/if}
-</div>
-
+</GlassCard>

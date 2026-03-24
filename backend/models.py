@@ -2,8 +2,12 @@ from pydantic import BaseModel
 from typing import Optional, List
 from uuid import UUID
 
-class UserLogin(BaseModel):
-    username: str
+class LoginRequest(BaseModel):
+    username: str # This is email for staff, or student_id for students (if unified)
+    password: str
+
+class StaffLoginRequest(BaseModel):
+    username: str # ID Number
     password: str
 
 class StudentImport(BaseModel):
@@ -13,7 +17,7 @@ class StudentImport(BaseModel):
 class StudentManualCreate(BaseModel):
     student_id: str
     full_name: str
-    course: Optional[str] = None
+    program: Optional[str] = None
     year_level: Optional[int] = None
 
 class ElectionCreate(BaseModel):
@@ -41,6 +45,29 @@ class VoteSubmit(BaseModel):
     student_id: str
     election_id: UUID
     votes: List[VoteItem]
+    voting_pin: str
+
+class PasscodeVerify(BaseModel):
+    election_id: UUID
+    passcode: str
 
 class StudentAuth(BaseModel):
     student_id: str
+
+class StudentUpdate(BaseModel):
+    full_name: Optional[str] = None
+    program: Optional[str] = None
+    year_level: Optional[int] = None
+
+class AdviserCreate(BaseModel):
+    email: str
+    password: str
+    full_name: str
+    department: Optional[str] = None
+
+class RegisterRequest(BaseModel):
+    username: str # ID Number
+    password: str
+    full_name: str
+    role: str # 'admin' or 'adviser'
+    department: Optional[str] = None

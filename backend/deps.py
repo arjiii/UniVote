@@ -5,21 +5,21 @@ from the Authorization: Bearer <token> header.
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dataclasses import dataclass
-from database import supabase
 import jwt
-from datetime import datetime, timedelta
+import os
+from datetime import datetime, timedelta, timezone
 
 bearer_scheme = HTTPBearer()
 
-SECRET_KEY = "UNIVOTE_SUPER_SECRET_KEY_DEV_ONLY"
+SECRET_KEY = os.environ.get("UNIVOTE_JWT_SECRET", "UNIVOTE_SUPER_SECRET_KEY_DEV_ONLY")
 ALGORITHM = "HS256"
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -34,7 +34,7 @@ class StudentUser:
     id: str  # The UUID from database
     student_id: str  # The human-readable ID (e.g. 2024-0001)
 
-def get_current_user(
+async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> AuthUser:
     """
@@ -59,7 +59,7 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token.")
 
 
-def get_current_student(
+async def get_current_student(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> StudentUser:
     """
@@ -75,23 +75,28 @@ def get_current_student(
             id=payload.get("sub"),
             student_id=payload.get("student_id")
         )
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired student session.")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Student token has expired.")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid student token.")
+    except Exception as e:
+        print(f"Student auth error: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Student session error.")
 
 
-def require_admin(user: AuthUser = Depends(get_current_user)) -> AuthUser:
+async def require_admin(user: AuthUser = Depends(get_current_user)) -> AuthUser:
     if user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required.")
     return user
 
 
-def require_adviser(user: AuthUser = Depends(get_current_user)) -> AuthUser:
+async def require_adviser(user: AuthUser = Depends(get_current_user)) -> AuthUser:
     if user.role not in ("admin", "adviser"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Adviser access required.")
     return user
 
 
-def require_student(student: StudentUser = Depends(get_current_student)) -> StudentUser:
+async def require_student(student: StudentUser = Depends(get_current_student)) -> StudentUser:
     return student
 
 

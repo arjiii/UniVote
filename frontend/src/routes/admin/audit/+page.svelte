@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { admin as adminApi } from '$lib/api.js';
+  import GlassCard from '$lib/components/GlassCard.svelte';
 
   /** @type {Array<any>} */
   let auditLogs = $state([]);
@@ -29,14 +30,6 @@
   );
 
   /** @param {string} action */
-  function actionColor(action) {
-    if (action?.includes('DELETE')) return 'bg-red-50 text-red-600 border-red-100';
-    if (action?.includes('CREATE') || action?.includes('ADD') || action?.includes('IMPORT')) return 'bg-emerald-50 text-emerald-700 border-emerald-100';
-    if (action?.includes('UPDATE') || action?.includes('STATUS')) return 'bg-blue-50 text-blue-700 border-blue-100';
-    return 'bg-stone-100 text-stone-600 border-stone-200';
-  }
-
-  /** @param {string} action */
   function actionIcon(action) {
     if (action?.includes('DELETE')) return 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16';
     if (action?.includes('CREATE') || action?.includes('ADD') || action?.includes('IMPORT')) return 'M12 6v6m0 0v6m0-6h6m-6 0H6';
@@ -45,107 +38,106 @@
   }
 </script>
 
-<svelte:head>
-  <title>Audit Logs | UniVote Admin</title>
-</svelte:head>
+<svelte:head><title>Audit Logs | UniVote Admin</title></svelte:head>
 
-<div class="max-w-5xl mx-auto px-5 md:px-8 py-8 space-y-6">
-
-  <!-- Header -->
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-    <div>
-      <p class="text-[10px] font-semibold text-stone-400 dark:text-stone-500 tracking-widest uppercase mb-1">Admin</p>
-      <h1 class="text-2xl font-semibold text-stone-900 dark:text-white">Audit Logs</h1>
-      <p class="text-stone-500 dark:text-stone-400 text-sm mt-0.5">A complete record of all system actions.</p>
+<GlassCard title="Audit Logs" subtitle="System Administrator">
+  {#snippet headerExtra()}
+    <div style="position:relative;">
+      <svg style="position:absolute;left:0.625rem;top:50%;transform:translateY(-50%);width:1rem;height:1rem;color:var(--text-subtle);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      <input
+        bind:value={searchQuery}
+        placeholder="Filter logs…"
+        class="input-base btn-sm"
+        style="padding-left:2rem;width:240px;"
+      />
     </div>
-    <div class="flex items-center gap-2 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl shadow-sm">
-      <div class="relative w-64">
-        <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-        </svg>
-        <input
-          bind:value={searchQuery}
-          placeholder="Search actions..."
-          class="w-full pl-9 pr-4 py-2.5 bg-transparent text-stone-900 dark:text-white text-xs focus:outline-none rounded-xl placeholder-stone-400 dark:placeholder-stone-500"
-        />
-      </div>
-    </div>
-  </div>
+  {/snippet}
 
   <!-- Stats row -->
-  <div class="grid grid-cols-3 gap-4">
+  <div class="bento-grid bento-3col">
     {#each [
-      { label: 'Total Events', value: auditLogs.length },
-      { label: 'Admin Actions', value: auditLogs.filter(l => l.actor_role === 'admin').length },
-      { label: 'Adviser Actions', value: auditLogs.filter(l => l.actor_role === 'adviser').length }
+      { label: 'Total Events',    value: auditLogs.length, sub: 'All recorded ops' },
+      { label: 'Admin Actions',   value: auditLogs.filter(l => l.actor_role === 'admin').length, sub: 'System level ops' },
+      { label: 'Adviser Actions', value: auditLogs.filter(l => l.actor_role === 'adviser').length, sub: 'Gatekeeper ops' }
     ] as stat}
-      <div class="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-700 p-4 text-center">
-        <p class="text-2xl font-semibold text-stone-900 dark:text-white">{stat.value}</p>
-        <p class="text-[10px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-widest mt-1">{stat.label}</p>
+      <div class="stat-card">
+        <p class="section-label">{stat.label}</p>
+        <p style="font-size:1.75rem;font-weight:800;color:var(--text-main);line-height:1;margin-top:0.25rem;">{stat.value}</p>
+        <p style="font-size:0.6875rem;color:var(--text-subtle);margin-top:0.25rem;">{stat.sub}</p>
       </div>
     {/each}
   </div>
 
   <!-- Log Table -->
-  <div class="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-700 overflow-hidden">
-    <div class="px-6 py-4 border-b border-stone-100 dark:border-stone-700 flex items-center justify-between">
-      <h2 class="text-sm font-semibold text-stone-900 dark:text-white">System Audit Trail</h2>
-      <span class="text-[10px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-widest">
-        {filteredLogs.length} record{filteredLogs.length !== 1 ? 's' : ''}
-      </span>
+  <div class="admin-card" style="overflow:hidden;">
+    <div style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-main);">
+      <p class="section-label">
+        {filteredLogs.length} event{filteredLogs.length !== 1 ? 's' : ''}
+        {searchQuery ? ' matching filter' : ''}
+      </p>
     </div>
 
     {#if isLoading}
-      <div class="py-20 flex items-center justify-center text-stone-400 dark:text-stone-500 text-sm animate-pulse">
-        Retrieving audit logs...
+      <div style="padding:1.5rem;display:flex;flex-direction:column;gap:0.5rem;">
+        {#each Array(5) as _}
+          <div class="skeleton" style="height:3rem;"></div>
+        {/each}
       </div>
     {:else if filteredLogs.length === 0}
-      <div class="py-20 flex flex-col items-center justify-center text-stone-400 dark:text-stone-500 text-xs gap-2">
-        <svg class="w-8 h-8 text-stone-300 dark:text-stone-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
-        </svg>
-        <p>{searchQuery ? 'No logs match your search.' : 'No activity has been logged yet.'}</p>
-      </div>
+      <div class="empty-state">{searchQuery ? 'No logs match your filter.' : 'No protocol data recorded.'}</div>
     {:else}
-      <div class="divide-y divide-stone-50 dark:divide-stone-800">
-        {#each filteredLogs as log}
-          {@const color = actionColor(log.action)}
-          <div class="flex items-start gap-4 px-6 py-4 hover:bg-stone-50/60 dark:hover:bg-stone-800/60 transition-colors">
-            <!-- Icon -->
-            <div class="w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 {color}">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d={actionIcon(log.action)}/>
-              </svg>
-            </div>
-
-            <!-- Content -->
-            <div class="flex-1 min-w-0">
-              <div class="flex flex-wrap items-center gap-2 mb-0.5">
-                <p class="text-xs font-bold text-stone-900 dark:text-white font-mono">{log.action}</p>
-                {#if log.target_type}
-                  <span class="text-[10px] font-semibold text-stone-400 dark:text-stone-400 uppercase tracking-tighter bg-stone-100 dark:bg-stone-800 px-1.5 py-0.5 rounded border border-stone-200 dark:border-stone-700">
-                    {log.target_type}
-                  </span>
-                {/if}
-                <span class="text-[10px] font-semibold uppercase tracking-tighter px-1.5 py-0.5 rounded border
-                  {log.actor_role === 'admin' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-800' : 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 border-violet-100 dark:border-violet-800'}">
-                  {log.actor_role}
-                </span>
-              </div>
-              {#if log.details && Object.keys(log.details).length > 0}
-                <p class="text-[10px] text-stone-400 dark:text-stone-500 truncate max-w-md">
-                  {Object.entries(log.details).map(([k, v]) => `${k}: ${v}`).join(' · ')}
-                </p>
-              {/if}
-            </div>
-
-            <!-- Timestamp -->
-            <div class="text-right shrink-0">
-              <p class="text-[10px] text-stone-400 dark:text-stone-500 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</p>
-            </div>
-          </div>
-        {/each}
+      <div style="overflow-x:auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width:1%;">Icon</th>
+              <th>Action</th>
+              <th>Role</th>
+              <th>Details</th>
+              <th style="text-align:right;">Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each filteredLogs as log (log.id || Math.random())}
+              <tr>
+                <td>
+                  <div style="width:28px;height:28px;background-color:var(--bg-elevated);color:var(--text-muted);border-radius:6px;display:flex;align-items:center;justify-content:center;">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d={actionIcon(log.action)}/>
+                    </svg>
+                  </div>
+                </td>
+                <td style="font-weight:600;color:var(--text-main);font-size:0.75rem;">
+                  {log.action}
+                  {#if log.target_type}
+                    <span style="display:inline-block;margin-left:0.375rem;padding:0.125rem 0.375rem;background-color:var(--bg-elevated);color:var(--text-subtle);border-radius:4px;font-size:0.625rem;">
+                      {log.target_type}
+                    </span>
+                  {/if}
+                </td>
+                <td>
+                  {#if log.actor_role === 'admin'}
+                    <span class="pill pill-warning pill-dot">Admin</span>
+                  {:else}
+                    <span class="pill pill-info pill-dot">Adviser</span>
+                  {/if}
+                </td>
+                <td style="color:var(--text-muted);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                  {#if log.details && Object.keys(log.details).length > 0}
+                    {Object.entries(log.details).map(([k, v]) => `${k}: ${v}`).join(' · ')}
+                  {:else}
+                    <span style="color:var(--text-subtle);">None</span>
+                  {/if}
+                </td>
+                <td style="text-align:right;white-space:nowrap;">
+                  <span style="font-weight:600;color:var(--text-main);">{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span style="display:block;font-size:0.625rem;color:var(--text-subtle);margin-top:0.125rem;">{new Date(log.created_at).toLocaleDateString()}</span>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
       </div>
     {/if}
   </div>
-</div>
+</GlassCard>

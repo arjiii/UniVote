@@ -5,6 +5,7 @@
   import { authSession } from '$lib/stores/auth.js';
   import { theme, toggleTheme } from '$lib/stores/theme.js';
   import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
+  import GlassCard from '$lib/components/GlassCard.svelte';
   import { fade, fly } from 'svelte/transition';
 
   onMount(() => {
@@ -14,7 +15,7 @@
   });
 
   let fullName = $state('');
-  let email = $state('');
+  let id = $state('');
   let password = $state('');
   let role = $state(/** @type {'admin' | 'adviser'} */ ('adviser'));
   let department = $state('');
@@ -25,7 +26,7 @@
 
   async function handleRegister(/** @type {SubmitEvent} */ e) {
     e.preventDefault();
-    if (!email || !password || !fullName) {
+    if (!id || !password || !fullName) {
       errorMessage = 'Please fill out all required fields.';
       return;
     }
@@ -33,8 +34,8 @@
       errorMessage = 'Full name must be at least 2 characters.';
       return;
     }
-    if (!email.includes('@')) {
-      errorMessage = 'Please enter a valid email address.';
+    if (id.length < 3) {
+      errorMessage = 'ID must be at least 3 characters.';
       return;
     }
     if (password.length < 6) {
@@ -48,7 +49,7 @@
 
     try {
       const payload = {
-        email,
+        id,
         password,
         full_name: fullName,
         role,
@@ -58,9 +59,7 @@
       const data = await authApi.register(payload);
       successMessage = data.message;
       
-      setTimeout(() => {
-        goto('/login');
-      }, 2000);
+      setTimeout(() => { goto('/login'); }, 2000);
 
     } catch (/** @type {any} */ err) {
       errorMessage = err.message ?? 'Registration failed.';
@@ -74,173 +73,129 @@
   <title>Register | UniVote Staff Portal</title>
 </svelte:head>
 
-<div class="min-h-screen flex bg-stone-50 dark:bg-stone-950 transition-colors duration-500" class:dark={$theme === 'dark'}>
+<div class="min-h-screen flex bg-surface-main transition-colors duration-500" class:dark={$theme === 'dark'}>
   <!-- Left Branding Panel -->
-  <div class="hidden lg:flex w-[44%] flex-col justify-between bg-stone-100 dark:bg-stone-900 border-r border-stone-200 dark:border-stone-800 p-10 relative overflow-hidden flex-shrink-0">
+  <div class="hidden lg:flex w-[44%] flex-col justify-between bg-surface-elevated border-r border-line-main p-12 relative overflow-hidden flex-shrink-0">
     <!-- Decorative circles -->
-    <div class="absolute -top-32 -left-32 w-80 h-80 rounded-full border-[40px] border-stone-200/50 dark:border-stone-800/50 pointer-events-none"></div>
-    <div class="absolute -top-16 -left-16 w-48 h-48 rounded-full border-[20px] border-stone-300/30 dark:border-stone-700/30 pointer-events-none"></div>
+    <div class="absolute -top-32 -left-32 w-80 h-80 rounded-full border-[40px] border-line-subtle pointer-events-none opacity-50"></div>
+    <div class="absolute -top-16 -left-16 w-48 h-48 rounded-full border-[20px] border-line-strong pointer-events-none opacity-30"></div>
 
-    <div class="relative flex items-center gap-3">
+    <div class="relative flex items-center gap-4">
       <button 
         onclick={toggleTheme}
-        class="w-8 h-8 bg-stone-950 dark:bg-stone-50 rounded-xl flex items-center justify-center text-white dark:text-stone-950 text-xs font-black shadow-xl hover:shadow-brand-500/20 hover:scale-110 hover:rotate-3 active:scale-95 transition-all duration-300 outline-none"
+        class="w-10 h-10 bg-content-main text-surface-main rounded-2xl flex items-center justify-center text-sm font-black shadow-xl hover:scale-110 active:scale-95 transition-all duration-300 outline-none"
       >
         U
       </button>
-      <span class="font-bold text-sm tracking-tight dark:text-white transition-colors">UniVote</span>
+      <span class="font-black text-lg tracking-tighter text-content-main uppercase mt-0.5">UniVote</span>
     </div>
 
-    <div class="relative">
-      <h1 class="text-4xl font-black text-stone-950 dark:text-white leading-[1.1] mb-6 tracking-tighter transition-colors">
-        Join the<br/><span class="text-stone-500">UniVote team.</span>
+    <div class="relative max-w-sm">
+      <h1 class="text-5xl font-black text-content-main leading-[1.05] mb-8 tracking-tighter uppercase">
+        Join the<br/><span class="text-content-muted">university board.</span>
       </h1>
-      <p class="text-stone-500 dark:text-stone-400 text-sm leading-relaxed max-w-xs mb-10 font-medium transition-colors">
-        Register as an Admin or Adviser to manage elections, candidates, and results.
+      <p class="text-content-subtle text-sm leading-relaxed font-bold uppercase tracking-widest mb-12">
+        Register as an Admin or Adviser to execute digital protocols and manage student agency.
       </p>
 
-      <div class="space-y-4">
-        {#each ['Manage Elections End-to-End', 'Import & Oversee Student Voters', 'Monitor Results in Real-time', 'Full Activity Audit Trail'] as feature}
-          <div class="flex items-center gap-3 group">
-            <div class="w-6 h-6 bg-stone-200 dark:bg-stone-800 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-              <svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" stroke-width="4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+      <div class="space-y-6">
+        {#each ['End-to-End Election Ops', 'Student Registry Oversight', 'Real-time Flux Monitoring', 'Verifiable Audit Ledger'] as feature}
+          <div class="flex items-center gap-4 group">
+            <div class="w-8 h-8 bg-surface-main border border-line-strong rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+              <svg class="w-4 h-4 text-brand-primary" fill="none" stroke="currentColor" stroke-width="4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
             </div>
-            <span class="text-sm font-bold text-stone-700 dark:text-stone-300 transition-colors">{feature}</span>
+            <span class="text-[10px] font-black uppercase tracking-[0.2em] text-content-main transition-colors">{feature}</span>
           </div>
         {/each}
       </div>
     </div>
 
-    <p class="relative text-stone-400 dark:text-stone-600 text-[10px] font-bold uppercase tracking-widest">© 2025 UniVote. All rights reserved.</p>
+    <p class="relative text-content-subtle text-[9px] font-black uppercase tracking-[0.3em]">© 2025 UniVote · System Integrity Nominal</p>
   </div>
 
   <!-- Right Registration Panel -->
-  <div class="flex-1 flex flex-col items-center justify-center p-8 overflow-y-auto" in:fade={{ duration: 500 }}>
+  <div class="flex-1 flex flex-col items-center justify-center p-6 md:p-12 overflow-y-auto" in:fade={{ duration: 500 }}>
     <div class="w-full max-w-md py-8">
-      <!-- Mobile logo -->
-      <div class="lg:hidden flex items-center gap-3 mb-10">
-        <button 
-          onclick={toggleTheme}
-          class="w-9 h-9 bg-stone-900 dark:bg-stone-50 rounded-xl flex items-center justify-center text-white dark:text-stone-950 text-base font-black shadow-xl hover:scale-110 active:scale-95 transition-all outline-none"
-        >
-          U
-        </button>
-        <span class="font-bold text-stone-950 dark:text-white text-lg transition-colors">UniVote</span>
-      </div>
+      <GlassCard title="Access Provisioning" subtitle="Request Personnel Clearance" hideMobileDashboardOnly={false}>
+        <!-- Role Switch -->
+        <div class="mt-4 flex gap-2 p-1.5 bg-surface-main border border-line-main rounded-2xl transition-all shadow-inner">
+          <button 
+            type="button" 
+            onclick={() => role = 'adviser'}
+            class="flex-1 py-3 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl transition-all duration-300 {role === 'adviser' ? 'bg-content-main text-surface-main shadow-xl' : 'text-content-subtle hover:text-content-muted'}"
+          >
+            Adviser
+          </button>
+          <button 
+            type="button" 
+            onclick={() => role = 'admin'}
+            class="flex-1 py-3 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl transition-all duration-300 {role === 'admin' ? 'bg-content-main text-surface-main shadow-xl' : 'text-content-subtle hover:text-content-muted'}"
+          >
+            Admin
+          </button>
+        </div>
 
-      <div in:fly={{ y: 20, duration: 500, delay: 100 }}>
-        <h2 class="text-3xl font-black text-stone-950 dark:text-white tracking-tighter transition-colors">Create account</h2>
-        <p class="text-stone-500 dark:text-stone-400 text-sm mt-1.5 font-medium transition-colors">Request staff access to the UniVote portal</p>
-      </div>
+        <form onsubmit={handleRegister} class="mt-8 space-y-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="md:col-span-2 space-y-2">
+              <label for="fullName" class="field-label ml-1">Legal Identity</label>
+              <input type="text" id="fullName" bind:value={fullName} placeholder="Jane Doe" class="input-base w-full uppercase" required>
+            </div>
 
-      <!-- Role Switch -->
-      <div class="mt-6 flex gap-2 p-1.5 bg-stone-100 dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 transition-colors" in:fly={{ y: 20, duration: 500, delay: 150 }}>
-        <button 
-          type="button" 
-          onclick={() => role = 'adviser'}
-          class="flex-1 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 {role === 'adviser' ? 'bg-white dark:bg-stone-800 text-stone-950 dark:text-white shadow-xl shadow-black/5' : 'text-stone-400 hover:text-stone-600'}"
-        >
-          Adviser
-        </button>
-        <button 
-          type="button" 
-          onclick={() => role = 'admin'}
-          class="flex-1 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 {role === 'admin' ? 'bg-white dark:bg-stone-800 text-stone-950 dark:text-white shadow-xl shadow-black/5' : 'text-stone-400 hover:text-stone-600'}"
-        >
-          Admin
-        </button>
-      </div>
+            {#if role === 'adviser'}
+              <div class="md:col-span-2 space-y-2" in:fade={{ duration: 200 }}>
+                <label for="department" class="field-label ml-1">Departmental Sector</label>
+                <input type="text" id="department" bind:value={department} placeholder="e.g. Computer Science" class="input-base w-full uppercase">
+              </div>
+            {/if}
 
-      <form onsubmit={handleRegister} class="mt-6 space-y-4" in:fly={{ y: 20, duration: 500, delay: 200 }}>
-        <!-- Full name + department row on md+ -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="md:col-span-2">
-            <label for="fullName" class="field-label">Full Name</label>
-            <input 
-              type="text" 
-              id="fullName" 
-              bind:value={fullName} 
-              placeholder="Jane Doe"
-              class="input-base"
-              required
-            >
-            <p class="text-slate-400 text-[10px] mt-1.5">Legal name as it appears on official records.</p>
+            <div class="space-y-2">
+              <label for="id" class="field-label ml-1">Registry ID</label>
+              <input type="text" id="id" bind:value={id} placeholder="e.g. 2026-001" class="input-base w-full uppercase" required>
+            </div>
+            
+            <div class="space-y-2">
+              <label for="password" class="field-label ml-1">Master Cipher</label>
+              <input type="password" id="password" bind:value={password} placeholder="••••••••" class="input-base w-full uppercase" required minlength="6">
+            </div>
           </div>
 
-          {#if role === 'adviser'}
-            <div class="md:col-span-2" in:fade={{ duration: 200 }}>
-              <label for="department" class="field-label">Department (Optional)</label>
-              <input 
-                type="text" 
-                id="department" 
-                bind:value={department} 
-                placeholder="e.g. Computer Science"
-                class="input-base"
-              >
+          {#if errorMessage}
+            <div class="pill pill-danger" style="width:100%;justify-content:flex-start;">
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+              {errorMessage}
             </div>
           {/if}
 
-          <div>
-            <label for="email" class="field-label">Email Address</label>
-            <input 
-              type="email" 
-              id="email" 
-              bind:value={email} 
-              placeholder="staff@univote.edu"
-              class="input-base"
-              required
-            >
-          </div>
-          
-          <div>
-            <label for="password" class="field-label">Password</label>
-            <input 
-              type="password" 
-              id="password" 
-              bind:value={password} 
-              placeholder="Min. 6 characters"
-              class="input-base"
-              required
-              minlength="6"
-            >
-          </div>
-        </div>
-
-        {#if errorMessage}
-          <div class="p-3.5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2.5 text-red-700 text-sm" in:fly={{ y: -5, duration: 200 }}>
-            <svg class="w-4 h-4 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
-            <p class="font-medium">{errorMessage}</p>
-          </div>
-        {/if}
-
-        {#if successMessage}
-          <div class="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-2.5 text-emerald-700 text-sm" in:fade>
-            <svg class="w-4 h-4 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-            <p class="font-semibold">{successMessage}</p>
-          </div>
-        {/if}
-
-        <button 
-          type="submit" 
-          disabled={isSubmitting || !!successMessage}
-          class="btn-premium w-full py-4 text-sm font-black shadow-2xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-        >
-          {#if isSubmitting}
-            <LoadingSpinner />
-            <span>Creating Account...</span>
-          {:else}
-            <span>Complete Registration</span>
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
+          {#if successMessage}
+            <div class="pill pill-success" style="width:100%;justify-content:flex-start;">
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+              {successMessage}
+            </div>
           {/if}
-        </button>
-      </form>
 
-      <div class="mt-6 pt-5 border-t border-slate-200 text-center">
-        <p class="text-sm text-slate-500 font-medium">
-          Already have an account? 
-          <a href="/login" class="text-indigo-600 hover:text-indigo-700 font-semibold transition-colors ml-1">Sign In</a>
-        </p>
-      </div>
+          <button type="submit" disabled={isSubmitting || !!successMessage} class="btn-primary w-full py-5 text-[11px]">
+            {#if isSubmitting}
+              <span class="flex items-center justify-center gap-3">
+                <div class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                Committing Data...
+              </span>
+            {:else}
+              Execute Formation
+            {/if}
+          </button>
+        </form>
+
+        <div class="mt-10 pt-8 border-t border-line-main text-center space-y-4">
+          <p class="text-[10px] font-black text-content-subtle uppercase tracking-widest">
+            Identity Active? <a href="/login" class="text-content-main hover:underline underline-offset-4">Personnel Gate</a>
+          </p>
+          <a href="/" class="inline-flex items-center gap-2 text-[10px] font-black text-content-subtle hover:text-content-main uppercase tracking-[0.2em] transition-all">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+            Command Center
+          </a>
+        </div>
+      </GlassCard>
     </div>
   </div>
 </div>

@@ -3,14 +3,14 @@
   import { goto } from '$app/navigation';
   import { student as studentApi } from '$lib/api.js';
   import { voterSession } from '$lib/stores/session.js';
-  import { fade, fly } from 'svelte/transition';
+  import GlassCard from '$lib/components/GlassCard.svelte';
+  import StatusBadge from '$lib/components/StatusBadge.svelte';
+  import { fade } from 'svelte/transition';
 
   let isLoading = $state(true);
-  /** @type {any[]} */
-  let elections = $state([]);
-  let voterName = $state('');
+  let elections = $derived($voterSession?.elections || []);
+  let voterName = $derived($voterSession?.full_name || 'Student');
 
-  // Vote summary state (for viewing after voting)
   let selectedSummaryElection = $state(/** @type {string | null} */ (null));
   let summaryLoading = $state(false);
   let receiptId = $state('');
@@ -18,206 +18,226 @@
   /** @type {any[]} */
   let voteDetails = $state([]);
 
-  onMount(() => {
+  onMount(async () => {
     const session = $voterSession;
     if (!session) { goto('/student/validate'); return; }
-    voterName = session?.full_name || 'Student';
-    elections = session?.elections || [];
-    isLoading = false;
+    try {
+      const resp = await studentApi.validate(session.student_id);
+      if (resp?.student) {
+        voterSession.login({ ...resp.student, access_token: resp.access_token, elections: resp.active_elections });
+      }
+    } catch (err) { console.error('Session sync failed:', err); }
+    finally { isLoading = false; }
   });
 
-  const stats = $derived(() => {
-    const total = elections.length;
-    const voted = elections.filter(/** @param {any} e */ e => e.has_voted).length;
-    const pending = total - voted;
-    return { total, voted, pending };
+  const stats = $derived({
+    total:   elections.length,
+    voted:   elections.filter(/** @param {any} e */ e => e.has_voted).length,
+    pending: elections.length - elections.filter(/** @param {any} e */ e => e.has_voted).length
   });
 
   /** @param {string} electionId */
   async function loadVoteSummary(electionId) {
     const session = $voterSession;
     if (!session) return;
-    if (selectedSummaryElection === electionId) {
-      selectedSummaryElection = null;
-      return;
-    }
+    if (selectedSummaryElection === electionId) { selectedSummaryElection = null; return; }
     selectedSummaryElection = electionId;
     summaryLoading = true;
     try {
       const data = await studentApi.getVoteSummary(session.student_id, electionId);
-      receiptId = data.receipt_id || '';
-      votedAt = data.voted_at || '';
-      voteDetails = data.votes || [];
-    } catch (err) {
-      console.error('Failed to load vote summary:', err);
-    } finally {
-      summaryLoading = false;
-    }
+      receiptId   = data.receipt_id || '';
+      votedAt     = data.voted_at   || '';
+      voteDetails = data.votes      || [];
+    } catch (err) { console.error('Vote summary load failed:', err); }
+    finally { summaryLoading = false; }
+  }
+
+  /** @param {string} firstName */
+  function greeting(firstName) {
+    const h = new Date().getHours();
+    if (h < 12) return `Good morning, ${firstName}`;
+    if (h < 18) return `Good afternoon, ${firstName}`;
+    return `Good evening, ${firstName}`;
   }
 </script>
 
-<svelte:head>
-  <title>Student Dashboard | UniVote</title>
-</svelte:head>
+<svelte:head><title>Student Dashboard | UniVote</title></svelte:head>
 
-<div class="max-w-5xl mx-auto w-full px-5 md:px-8 py-8">
-
-  <!-- Header -->
-  <div class="mb-10" in:fly={{ y: -10, duration: 300 }}>
-    <div class="flex items-center gap-2 mb-1">
-      <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-      <p class="text-[10px] font-semibold text-stone-400 dark:text-stone-500 tracking-widest uppercase">Student Portal Home</p>
-    </div>
-    <h1 class="text-3xl font-bold text-stone-900 dark:text-white tracking-tight">Welcome, {voterName.split(' ')[0]} 👋</h1>
-    <p class="text-stone-500 dark:text-stone-400 text-sm mt-1.5">Manage your participation and monitor live results from your personal dashboard.</p>
-  </div>
-
-  <!-- Quick Stats -->
-  {#if !isLoading && elections.length > 0}
-    {@const s = stats()}
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10" in:fly={{ y: 20, duration: 400, delay: 100 }}>
-      <div class="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 p-5 rounded-2xl shadow-sm hover:border-stone-300 dark:hover:border-stone-600 transition-all group">
-        <p class="text-[10px] font-bold text-stone-400 dark:text-stone-500 uppercase tracking-widest mb-1 group-hover:text-stone-900 dark:group-hover:text-white transition-colors">Total Sessions</p>
-        <p class="text-2xl font-bold text-stone-900 dark:text-white">{s.total}</p>
-      </div>
-      <div class="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 p-5 rounded-2xl shadow-sm hover:border-stone-300 dark:hover:border-stone-600 transition-all group">
-        <p class="text-[10px] font-bold text-stone-400 dark:text-stone-500 uppercase tracking-widest mb-1 group-hover:text-emerald-600 transition-colors">Completed</p>
-        <p class="text-2xl font-bold text-emerald-600">{s.voted}</p>
-      </div>
-      <div class="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 p-5 rounded-2xl shadow-sm hover:border-stone-300 dark:hover:border-stone-600 transition-all group">
-        <p class="text-[10px] font-bold text-stone-400 dark:text-stone-500 uppercase tracking-widest mb-1 group-hover:text-amber-600 transition-colors">Pending Action</p>
-        <p class="text-2xl font-bold text-amber-600">{s.pending}</p>
-      </div>
-    </div>
-  {/if}
+<GlassCard title={greeting(voterName.split(' ')[0])} subtitle="Student Portal">
 
   {#if isLoading}
-    <div class="py-20 flex flex-col items-center justify-center gap-3">
-      <div class="w-6 h-6 border-2 border-stone-300 dark:border-stone-600 border-t-stone-900 dark:border-t-white rounded-full animate-spin"></div>
-      <p class="text-stone-400 dark:text-stone-500 text-sm">Loading dashboard...</p>
+    <div style="padding:3rem 0;display:flex;flex-direction:column;align-items:center;gap:0.75rem;">
+      <div class="spinner"></div>
+      <p style="font-size:0.75rem;color:var(--text-subtle);font-weight:500;">Synchronizing account…</p>
     </div>
-  {:else if elections.length === 0}
-    <div class="py-16 flex flex-col items-center text-center" in:fade={{ duration: 300 }}>
-      <div class="w-14 h-14 bg-stone-100 dark:bg-stone-800 rounded-2xl flex items-center justify-center mb-4">
-        <svg class="w-7 h-7 text-stone-400 dark:text-stone-500" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-      </div>
-      <h3 class="text-base font-semibold text-stone-900 dark:text-white mb-1">No active elections</h3>
-      <p class="text-stone-500 dark:text-stone-400 text-sm max-w-xs">There are no elections currently in progress. Check back later.</p>
-    </div>
+
   {:else}
-      <div class="flex items-center justify-between mb-4">
-        <p class="text-[10px] font-bold text-stone-900 dark:text-white tracking-widest uppercase bg-stone-100 dark:bg-stone-800 px-3 py-1 rounded-lg">
-          {elections.length} Active Enrollment{elections.length !== 1 ? 's' : ''}
-        </p>
-        <div class="h-px flex-1 bg-stone-100 dark:bg-stone-800 mx-4 hidden sm:block"></div>
-        <p class="text-[10px] text-stone-400 dark:text-stone-500 font-medium italic">Click cards to expand details</p>
+    <!-- Stats row -->
+    {#if elections.length > 0}
+      {@const s = stats}
+      <div class="bento-grid bento-3col">
+        <div class="stat-card">
+          <p class="section-label">Total Elections</p>
+          <p style="font-size:1.75rem;font-weight:800;color:var(--text-main);line-height:1;margin-top:0.25rem;">{s.total}</p>
+        </div>
+        <div class="stat-card">
+          <p class="section-label" style="color:var(--status-success-fg);">Votes Cast</p>
+          <p style="font-size:1.75rem;font-weight:800;color:var(--status-success-fg);line-height:1;margin-top:0.25rem;">{s.voted}</p>
+        </div>
+        <div class="stat-card">
+          <p class="section-label" style="color:var(--status-warning-fg);">Pending</p>
+          <p style="font-size:1.75rem;font-weight:800;color:var(--status-warning-fg);line-height:1;margin-top:0.25rem;">{s.pending}</p>
+        </div>
       </div>
+    {/if}
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+    <!-- Election list -->
+    {#if elections.length === 0}
+      <div class="empty-state">
+        <svg style="width:2rem;height:2rem;color:var(--border-strong);margin-bottom:0.75rem;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        <p style="font-weight:600;color:var(--text-muted);margin-bottom:0.25rem;">No active elections</p>
+        <p style="font-size:0.8125rem;">You have no elections currently assigned. Check back later.</p>
+      </div>
+    {:else}
+      <div>
+        <p class="section-label" style="margin-bottom:0.75rem;">Active Elections ({elections.length})</p>
+        <div style="display:flex;flex-direction:column;gap:0.75rem;">
+          {#each elections as election, idx}
+            <div class="election-card admin-card" in:fade={{ duration: 200, delay: idx * 50 }}>
+              <div class="election-card-header">
+                <!-- Left: icon + info -->
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                  <div class="election-icon {election.has_voted ? 'voted' : 'pending'}">
+                    {#if election.has_voted}
+                      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                    {:else}
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    {/if}
+                  </div>
+                  <div>
+                    <p class="election-name">{election.name}</p>
+                    <p class="election-date">Ends {new Date(election.end_date ?? Date.now()).toLocaleDateString()}</p>
+                  </div>
+                </div>
+                <!-- Right: badge -->
+                <StatusBadge status={election.has_voted ? 'voted' : 'pending'} />
+              </div>
 
-      {#each elections as election, idx}
-        <div class="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-2xl overflow-hidden" in:fly={{ y: 12, duration: 300, delay: idx * 60 }}>
-          <div class="p-5">
-            <div class="flex items-center justify-between mb-3">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 {election.has_voted ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-stone-100 dark:bg-stone-800'} rounded-xl flex items-center justify-center">
-                  {#if election.has_voted}
-                    <svg class="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+              <!-- Actions -->
+              <div class="election-card-actions">
+                {#if election.has_voted}
+                  <button onclick={() => loadVoteSummary(election.id)} class="btn-secondary btn-sm">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                    {selectedSummaryElection === election.id ? 'Hide Receipt' : 'View Receipt'}
+                  </button>
+                  <a href="/student/results?election={election.id}" class="btn-ghost btn-sm">Results</a>
+                {:else}
+                  <a href="/student/ballot?election={election.id}" class="btn-primary btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;gap:0.375rem;">
+                    Cast Vote
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                  </a>
+                  <a href="/student/results?election={election.id}" class="btn-ghost btn-sm" style="text-decoration:none;">Results</a>
+                {/if}
+              </div>
+
+              <!-- Receipt drawer -->
+              {#if selectedSummaryElection === election.id}
+                <div class="receipt-drawer" in:fade={{ duration: 150 }}>
+                  {#if summaryLoading}
+                    <div style="display:flex;align-items:center;gap:0.5rem;padding:1rem;">
+                      <div class="spinner" style="width:1rem;height:1rem;border-width:2px;"></div>
+                      <span style="font-size:0.75rem;color:var(--text-subtle);">Loading receipt…</span>
+                    </div>
                   {:else}
-                    <svg class="w-5 h-5 text-stone-600 dark:text-stone-400" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    <!-- Receipt ID -->
+                    <div class="receipt-id-row">
+                      <div>
+                        <p class="section-label">Receipt ID</p>
+                        <code style="font-size:0.75rem;font-weight:600;color:var(--text-main);word-break:break-all;">{receiptId}</code>
+                      </div>
+                      <button
+                        onclick={() => navigator.clipboard.writeText(receiptId)}
+                        class="btn-icon" title="Copy to clipboard"
+                      >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"/></svg>
+                      </button>
+                    </div>
+                    {#if votedAt}
+                      <p style="font-size:0.6875rem;color:var(--status-success-fg);margin-bottom:0.75rem;display:flex;align-items:center;gap:0.375rem;">
+                        <span style="width:5px;height:5px;background:currentColor;border-radius:50%;display:inline-block;"></span>
+                        Certified at {new Date(votedAt).toLocaleString()}
+                      </p>
+                    {/if}
+                    <!-- Votes -->
+                    <div style="display:flex;flex-direction:column;gap:0.375rem;">
+                      {#each voteDetails as vote}
+                        <div class="vote-row">
+                          <div>
+                            <p class="section-label">{vote.position}</p>
+                            <p style="font-size:0.8125rem;font-weight:600;color:var(--text-main);">{vote.candidates?.students?.full_name || 'Unknown'}</p>
+                            <p style="font-size:0.6875rem;color:var(--text-subtle);">{vote.candidates?.partylists?.name || 'Independent'}</p>
+                          </div>
+                          <span class="pill pill-success pill-dot">Certified</span>
+                        </div>
+                      {/each}
+                    </div>
                   {/if}
                 </div>
-                <div>
-                  <h2 class="text-sm font-semibold text-stone-900 dark:text-white">{election.name}</h2>
-                  <span class="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide {election.has_voted ? 'text-emerald-600' : 'text-amber-600'}">
-                    <span class="w-1.5 h-1.5 rounded-full {election.has_voted ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}"></span>
-                    {election.has_voted ? 'Voted' : 'Not yet voted'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div class="flex items-center gap-2">
-              {#if election.has_voted}
-                <button
-                  onclick={() => loadVoteSummary(election.id)}
-                  class="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold hover:opacity-80 transition-all border"
-                  style="background-color: var(--bg-elevated); color: var(--text-main); border-color: var(--border-main);"
-                >
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-                  {selectedSummaryElection === election.id ? 'Hide Receipt' : 'View Receipt'}
-                </button>
-                <a href="/student/results?election={election.id}" 
-                   class="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold hover:opacity-80 transition-all border"
-                   style="background-color: var(--bg-card); color: var(--text-main); border-color: var(--border-main);"
-                >
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                  Results
-                </a>
-              {:else}
-                <a href="/student/ballot?election={election.id}" 
-                   class="flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-semibold hover:opacity-90 transition-all"
-                   style="background-color: var(--text-main); color: var(--bg-main);"
-                >
-                  Cast Your Vote
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
-                </a>
-                <a href="/student/results?election={election.id}" 
-                   class="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold hover:opacity-80 transition-all border"
-                   style="background-color: var(--bg-card); color: var(--text-main); border-color: var(--border-main);"
-                >
-                  Results
-                </a>
               {/if}
             </div>
-          </div>
-
-          <!-- Expandable vote receipt -->
-          {#if selectedSummaryElection === election.id}
-            <div class="border-t border-stone-200 dark:border-stone-700 p-5 bg-stone-50 dark:bg-stone-800/50" in:fly={{ y: -8, duration: 200 }}>
-              {#if summaryLoading}
-                <div class="py-4 flex items-center justify-center gap-2">
-                  <div class="w-4 h-4 border-2 border-stone-300 dark:border-stone-600 border-t-stone-900 dark:border-t-white rounded-full animate-spin"></div>
-                  <span class="text-stone-400 dark:text-stone-500 text-xs">Loading receipt...</span>
-                </div>
-              {:else}
-                <!-- Receipt ID -->
-                <div class="flex items-center justify-between bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-xl px-4 py-3 mb-3">
-                  <div>
-                    <p class="text-[10px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-widest">Verification ID</p>
-                    <code class="text-sm font-mono font-bold text-stone-900 dark:text-white tracking-widest">{receiptId}</code>
-                  </div>
-                  <button 
-                    onclick={() => navigator.clipboard.writeText(receiptId)}
-                    class="text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors p-1"
-                    title="Copy"
-                  >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"/></svg>
-                  </button>
-                </div>
-                {#if votedAt}
-                  <p class="text-xs text-stone-400 dark:text-stone-500 mb-3">Submitted on {new Date(votedAt).toLocaleString()}</p>
-                {/if}
-                <!-- Votes -->
-                <div class="space-y-2">
-                  {#each voteDetails as vote}
-                    <div class="flex items-center justify-between p-3 bg-white dark:bg-stone-900 rounded-xl border border-stone-100 dark:border-stone-700">
-                      <div>
-                        <p class="text-[10px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-widest">{vote.position}</p>
-                        <p class="text-sm font-medium text-stone-900 dark:text-white mt-0.5">{vote.candidates?.students?.full_name || 'Unknown'}</p>
-                        <p class="text-xs text-stone-400 dark:text-stone-500">{vote.candidates?.partylists?.name || 'Independent'}</p>
-                      </div>
-                      <div class="w-5 h-5 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center">
-                        <svg class="w-3 h-3 text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                      </div>
-                    </div>
-                  {/each}
-                </div>
-              {/if}
-            </div>
-          {/if}
+          {/each}
         </div>
-      {/each}
-    </div>
+      </div>
+    {/if}
   {/if}
-</div>
+</GlassCard>
+
+<style>
+  .election-card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+    gap: 0.75rem;
+  }
+  .election-icon {
+    width: 34px; height: 34px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .election-icon.voted   { background-color: var(--status-success-bg); color: var(--status-success-fg); }
+  .election-icon.pending { background-color: var(--bg-elevated); color: var(--text-subtle); }
+  .election-name { font-size: 0.875rem; font-weight: 600; color: var(--text-main); }
+  .election-date { font-size: 0.6875rem; color: var(--text-subtle); margin-top: 0.125rem; }
+
+  .election-card-actions {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.625rem 1rem;
+  }
+
+  .receipt-drawer {
+    border-top: 1px solid var(--border-main);
+    padding: 1rem;
+    background-color: var(--bg-elevated);
+    display: flex; flex-direction: column; gap: 0.75rem;
+  }
+  .receipt-id-row {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-main);
+    border-radius: 6px;
+    padding: 0.625rem 0.75rem;
+  }
+  .vote-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-main);
+    border-radius: 6px;
+    padding: 0.625rem 0.75rem;
+    gap: 0.75rem;
+  }
+
+  @media (max-width: 640px) {
+    .bento-grid { grid-template-columns: 1fr !important; }
+  }
+</style>

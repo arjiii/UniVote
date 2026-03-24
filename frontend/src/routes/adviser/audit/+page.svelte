@@ -1,6 +1,8 @@
 <script>
 	import { onMount } from 'svelte';
 	import { adviser } from '$lib/api.js';
+	import GlassCard from '$lib/components/GlassCard.svelte';
+	import { fly, fade } from 'svelte/transition';
 
 	/** @type {any[]} */
 	let logs = $state([]);
@@ -34,74 +36,79 @@
 	<title>System Audit Logs | UniVote</title>
 </svelte:head>
 
-<div class="max-w-5xl mx-auto px-5 md:px-8 py-8 space-y-6">
-	<!-- Page Header -->
-	<div class="flex items-center gap-4">
-		<div class="h-12 w-12 bg-stone-100 dark:bg-stone-800 rounded-2xl flex items-center justify-center text-stone-600 dark:text-stone-300 shadow-inner">
-			<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-		</div>
-		<div>
-			<p class="text-[10px] font-semibold text-stone-400 dark:text-stone-500 tracking-widest uppercase mb-1">Adviser</p>
-			<h1 class="text-2xl font-semibold text-stone-900 dark:text-white">Audit History</h1>
-			<p class="text-stone-500 dark:text-stone-400 text-sm mt-0.5">Reviewing system activities and administrative changes.</p>
-		</div>
-	</div>
+<GlassCard
+	title="Operational History"
+	subtitle="Protocol Logs & Activity Ledger"
+>
+	{#snippet headerExtra()}
+		<button 
+			onclick={loadLogs} 
+			class="btn-primary mt-4 lg:mt-0 px-6 py-3 rounded-2xl text-[10px] uppercase shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
+		>
+			Refresh Protocol
+		</button>
+	{/snippet}
 
-	<div class="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-2xl overflow-hidden">
-		<div class="overflow-x-auto">
-			<table class="w-full text-left border-collapse">
+	<div class="bg-surface-elevated border border-line-subtle rounded-[2.5rem] p-8" in:fly={{ y: 20, duration: 800 }}>
+		<div class="overflow-x-auto scrollbar-hide">
+			<table class="w-full text-left border-collapse min-w-[800px]">
 				<thead>
-					<tr class="bg-stone-50 dark:bg-stone-800/50 border-b border-stone-100 dark:border-stone-700">
-						<th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400 dark:text-stone-500">Timestamp</th>
-						<th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400 dark:text-stone-500">Activity</th>
-						<th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400 dark:text-stone-500">Target</th>
-						<th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400 dark:text-stone-500">Details</th>
+					<tr class="border-b border-line-main">
+						<th class="px-6 py-6 text-[9px] font-black uppercase tracking-[0.2em] text-content-muted">Stardate / Time</th>
+						<th class="px-6 py-6 text-[9px] font-black uppercase tracking-[0.2em] text-content-muted">Event</th>
+						<th class="px-6 py-6 text-[9px] font-black uppercase tracking-[0.2em] text-content-muted">Subject</th>
+						<th class="px-6 py-6 text-[9px] font-black uppercase tracking-[0.2em] text-content-muted">Metadata</th>
 					</tr>
 				</thead>
-				<tbody class="divide-y divide-stone-50 dark:divide-stone-800">
+				<tbody class="divide-y divide-line-subtle">
 					{#if isLoading}
-						{#each Array(5) as _}
+						{#each Array(6) as _}
 							<tr class="animate-pulse">
-								<td class="px-6 py-4"><div class="h-4 bg-stone-100 dark:bg-stone-800 rounded w-32"></div></td>
-								<td class="px-6 py-4"><div class="h-4 bg-stone-100 dark:bg-stone-800 rounded w-24"></div></td>
-								<td class="px-6 py-4"><div class="h-4 bg-stone-100 dark:bg-stone-800 rounded w-20"></div></td>
-								<td class="px-6 py-4"><div class="h-4 bg-stone-100 dark:bg-stone-800 rounded w-40"></div></td>
+								<td class="px-6 py-6"><div class="h-3 bg-surface-main rounded-full w-32 border border-line-main"></div></td>
+								<td class="px-6 py-6"><div class="h-3 bg-surface-main rounded-full w-24 border border-line-main"></div></td>
+								<td class="px-6 py-6"><div class="h-3 bg-surface-main rounded-full w-20 border border-line-main"></div></td>
+								<td class="px-6 py-6"><div class="h-3 bg-surface-main rounded-full w-40 border border-line-main"></div></td>
 							</tr>
 						{/each}
 					{:else}
 						{#each logs as log}
-							<tr class="hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors group">
-								<td class="px-6 py-4 text-xs font-medium text-stone-500 dark:text-stone-400">
-									{formatDate(log.created_at)}
+							<tr class="hover:bg-surface-hover transition-all group border-transparent border-l-4 hover:border-l-content-main">
+								<td class="px-6 py-6">
+									<div class="flex flex-col">
+										<span class="text-[10px] font-black text-content-main uppercase tracking-tight">{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+										<span class="text-[8px] font-black text-content-subtle uppercase tracking-widest mt-1">{new Date(log.created_at).toLocaleDateString()}</span>
+									</div>
 								</td>
-								<td class="px-6 py-4">
-									<span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800">
+								<td class="px-6 py-6">
+									<span class="inline-flex items-center px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest bg-content-main text-surface-main">
 										{formatAction(log.action)}
 									</span>
 								</td>
-								<td class="px-6 py-4">
+								<td class="px-6 py-6">
 									<div class="flex flex-col">
-										<span class="text-[10px] font-black uppercase tracking-tighter text-stone-400 dark:text-stone-500">{log.target_type || 'system'}</span>
-										<span class="text-[11px] font-mono text-stone-600 dark:text-stone-300 truncate max-w-[100px]" title={log.target_id}>{log.target_id?.substring(0,8) || '---'}</span>
+										<span class="text-[9px] font-black uppercase tracking-widest text-content-muted">{log.target_type || 'CORE'}</span>
+										<span class="text-[10px] font-mono text-content-main tracking-widest mt-0.5">{log.target_id?.substring(0,8) || 'SYSTEM'}</span>
 									</div>
 								</td>
-								<td class="px-6 py-4">
+								<td class="px-6 py-6">
 									<div class="flex flex-wrap gap-2">
 										{#if log.details}
 											{#each Object.entries(log.details) as [key, value]}
-												<span class="text-[10px] bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 px-2 py-0.5 rounded-md border border-stone-200 dark:border-stone-700">
-													<span class="font-bold opacity-50 uppercase">{key}:</span> {value}
+												<span class="text-[9px] bg-surface-main text-content-main px-2.5 py-1 rounded-md border border-line-main font-black uppercase tracking-tight hover:border-content-main transition-colors cursor-default">
+													<span class="text-content-muted">{key}:</span> {value}
 												</span>
 											{/each}
 										{:else}
-											<span class="text-[10px] text-stone-300 dark:text-stone-600 italic">No metadata available</span>
+											<span class="text-[9px] text-content-subtle uppercase tracking-[0.2em] italic">No Protocol Meta</span>
 										{/if}
 									</div>
 								</td>
 							</tr>
 						{:else}
 							<tr>
-								<td colspan="4" class="px-6 py-20 text-center text-stone-400 dark:text-stone-500 font-medium italic">No activities have been recorded in the audit history.</td>
+								<td colspan="4" class="px-6 py-32 text-center">
+									<p class="text-[10px] font-black text-content-subtle uppercase tracking-[0.3em]">Protocol Log Vacant · Integrity Confirmed</p>
+								</td>
 							</tr>
 						{/each}
 					{/if}
@@ -109,14 +116,8 @@
 			</table>
 		</div>
 		
-		<div class="p-4 bg-stone-50 dark:bg-stone-800/50 border-t border-stone-100 dark:border-stone-700 flex items-center justify-between">
-			<span class="text-[10px] font-bold text-stone-400 dark:text-stone-500 uppercase tracking-widest">Showing latest 100 entries</span>
-			<button 
-				onclick={loadLogs} 
-				class="btn-link text-[10px] uppercase tracking-widest"
-			>
-				Refresh Feed
-			</button>
+		<div class="px-8 py-6 flex items-center justify-between border-t border-line-main">
+			<span class="text-[9px] font-black text-content-subtle uppercase tracking-[0.2em]">Telemetry data · Latest 100 clusters indexed</span>
 		</div>
 	</div>
-</div>
+</GlassCard>

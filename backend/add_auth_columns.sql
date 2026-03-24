@@ -16,7 +16,7 @@ BEGIN
         ALTER TABLE public.admins ADD COLUMN password_hash TEXT NOT NULL;
     END IF;
 
-    -- Add email if missing (from the first schema it might be missing or different)
+    -- Add username if missing (acting as the Login ID)
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='admins' AND column_name='email') THEN
         ALTER TABLE public.admins ADD COLUMN email TEXT UNIQUE NOT NULL;
     END IF;

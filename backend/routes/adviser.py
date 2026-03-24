@@ -8,21 +8,21 @@ router = APIRouter()
 
 
 @router.get("/partylists")
-def get_partylists(
+async def get_partylists(
     election_id: str | None = None,
     user: AuthUser = Depends(require_adviser),
 ):
-    return {"data": adviser_service.get_partylists(election_id)}
+    return {"data": await adviser_service.get_partylists(election_id)}
 
 
 @router.post("/partylists")
-def create_partylist(
+async def create_partylist(
     partylist: PartylistCreate,
     election_id: str,
     user: AuthUser = Depends(require_adviser),
 ):
-    data = adviser_service.create_partylist(election_id, partylist.name)
-    audit_service.log_action(
+    data = await adviser_service.create_partylist(election_id, partylist.name)
+    await audit_service.log_action(
         actor_id=user.id, actor_role=user.role,
         action="CREATE_PARTYLIST", target_type="partylist",
         target_id=data[0]["id"] if data else None,
@@ -32,13 +32,13 @@ def create_partylist(
 
 
 @router.put("/partylists/{partylist_id}")
-def update_partylist(
+async def update_partylist(
     partylist_id: str,
     partylist: PartylistCreate,
     user: AuthUser = Depends(require_adviser),
 ):
-    data = adviser_service.update_partylist(partylist_id, partylist.name)
-    audit_service.log_action(
+    data = await adviser_service.update_partylist(partylist_id, partylist.name)
+    await audit_service.log_action(
         actor_id=user.id, actor_role=user.role,
         action="UPDATE_PARTYLIST", target_type="partylist",
         target_id=partylist_id,
@@ -48,12 +48,12 @@ def update_partylist(
 
 
 @router.delete("/partylists/{partylist_id}")
-def delete_partylist(
+async def delete_partylist(
     partylist_id: str,
     user: AuthUser = Depends(require_adviser),
 ):
-    data = adviser_service.delete_partylist(partylist_id)
-    audit_service.log_action(
+    data = await adviser_service.delete_partylist(partylist_id)
+    await audit_service.log_action(
         actor_id=user.id, actor_role=user.role,
         action="DELETE_PARTYLIST", target_type="partylist",
         target_id=partylist_id,
@@ -63,26 +63,26 @@ def delete_partylist(
 
 
 @router.get("/candidates")
-def get_candidates(
+async def get_candidates(
     election_id: str | None = None,
     user: AuthUser = Depends(require_adviser),
 ):
-    return {"data": adviser_service.get_candidates(election_id)}
+    return {"data": await adviser_service.get_candidates(election_id)}
 
 
 @router.post("/candidates")
-def create_candidate(
+async def create_candidate(
     candidate: CandidateCreate,
     election_id: str,
     user: AuthUser = Depends(require_adviser),
 ):
-    data = adviser_service.create_candidate(
+    data = await adviser_service.create_candidate(
         student_id=candidate.student_id,
         position=candidate.position,
         election_id=election_id,
         partylist_id=candidate.partylist_id,
     )
-    audit_service.log_action(
+    await audit_service.log_action(
         actor_id=user.id, actor_role=user.role,
         action="ADD_CANDIDATE", target_type="candidate",
         target_id=data[0]["id"] if data else None,
@@ -92,12 +92,12 @@ def create_candidate(
 
 
 @router.delete("/candidates/{candidate_id}")
-def delete_candidate(
+async def delete_candidate(
     candidate_id: str,
     user: AuthUser = Depends(require_adviser),
 ):
-    data = adviser_service.delete_candidate(candidate_id)
-    audit_service.log_action(
+    data = await adviser_service.delete_candidate(candidate_id)
+    await audit_service.log_action(
         actor_id=user.id, actor_role=user.role,
         action="DELETE_CANDIDATE", target_type="candidate",
         target_id=candidate_id,
@@ -107,16 +107,31 @@ def delete_candidate(
 
 
 @router.get("/live-results/{election_id}")
-def get_live_results(
+async def get_live_results(
     election_id: str,
     user: AuthUser = Depends(require_adviser),
 ):
-    return {"data": adviser_service.get_live_results(election_id)}
+    return {"data": await adviser_service.get_live_results(election_id)}
 
 
 @router.get("/audit-log")
-def get_audit_log(
+async def get_audit_log(
     limit: int = 100,
     user: AuthUser = Depends(require_adviser),
 ):
-    return {"data": audit_service.get_audit_log(limit)}
+    return {"data": await audit_service.get_audit_log(limit)}
+
+
+@router.post("/elections/{election_id}/refresh-passcode")
+async def refresh_passcode(
+    election_id: str,
+    user: AuthUser = Depends(require_adviser),
+):
+    new_passcode = await adviser_service.refresh_adviser_passcode(election_id)
+    await audit_service.log_action(
+        actor_id=user.id, actor_role=user.role,
+        action="REFRESH_PASSCODE", target_type="election",
+        target_id=election_id,
+        details={"passcode": new_passcode},
+    )
+    return {"message": "Passcode refreshed", "adviser_passcode": new_passcode}

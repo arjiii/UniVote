@@ -2,19 +2,20 @@
   import { onMount } from 'svelte';
   import { admin as adminApi } from '$lib/api.js';
   import Notification from '$lib/components/Notification.svelte';
+  import GlassCard from '$lib/components/GlassCard.svelte';
+  import StatusBadge from '$lib/components/StatusBadge.svelte';
 
   /** @type {Array<any>} */
   let elections = $state([]);
   let isLoading = $state(true);
   let newElection = $state({ name: '', start_date: '', end_date: '', description: '' });
   let isCreating = $state(false);
+  let showForm = $state(false);
 
   /** @type {{ text: string, type: 'info' | 'success' | 'error' }} */
   let notification = $state({ text: '', type: 'info' });
 
-  onMount(async () => {
-    await loadElections();
-  });
+  onMount(async () => { await loadElections(); });
 
   async function loadElections() {
     try {
@@ -42,10 +43,11 @@
       await adminApi.createElection({
         ...newElection,
         start_date: new Date(newElection.start_date).toISOString(),
-        end_date: new Date(newElection.end_date).toISOString()
+        end_date:   new Date(newElection.end_date).toISOString()
       });
       await loadElections();
       newElection = { name: '', start_date: '', end_date: '', description: '' };
+      showForm = false;
       notify('Election created successfully', 'success');
     } catch (/** @type {any} */ err) { notify(err.message ?? 'Failed to create election', 'error'); }
     finally { isCreating = false; }
@@ -71,100 +73,134 @@
       notify('Election deleted', 'success');
     } catch (/** @type {any} */ err) { notify(err.message ?? 'Failed to delete election', 'error'); }
   }
+
+  function toggleLabel(/** @type {string} */ status) {
+    if (status === 'upcoming')  return 'Activate';
+    if (status === 'active')    return 'Complete';
+    return '';
+  }
+  function toggleVariant(/** @type {string} */ status) {
+    if (status === 'upcoming') return 'btn-success btn-sm';
+    if (status === 'active')   return 'btn-danger btn-sm';
+    return '';
+  }
 </script>
 
-<svelte:head>
-  <title>Elections | UniVote Admin</title>
-</svelte:head>
+<svelte:head><title>Elections | UniVote Admin</title></svelte:head>
 
-<div class="max-w-5xl mx-auto px-5 md:px-8 py-8 space-y-6">
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-    <div>
-      <p class="text-[10px] font-semibold text-stone-400 dark:text-stone-500 tracking-widest uppercase mb-1">Admin</p>
-      <h1 class="text-2xl font-semibold text-stone-900 dark:text-white">Elections</h1>
-      <p class="text-stone-500 dark:text-stone-400 text-sm mt-0.5">Create and manage all elections.</p>
+<GlassCard title="Election Management" subtitle="Administrator">
+  {#snippet headerExtra()}
+    <div style="display:flex;gap:0.5rem;align-items:center;">
+      <button onclick={loadElections} class="btn-secondary btn-sm">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+        Refresh
+      </button>
+      <button onclick={() => showForm = !showForm} class="btn-primary btn-sm">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+        New Election
+      </button>
     </div>
-    <button onclick={loadElections} class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl text-sm font-medium text-stone-700 dark:text-stone-200 hover:bg-stone-50 dark:hover:bg-stone-700 transition-all">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-      Refresh
-    </button>
-  </div>
+  {/snippet}
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
-    <!-- Create Form -->
-    <div class="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-700 p-6">
-      <div class="flex items-center gap-3 mb-5">
-        <div class="w-9 h-9 bg-stone-100 dark:bg-stone-800 rounded-xl flex items-center justify-center">
-          <svg class="w-5 h-5 text-stone-600 dark:text-stone-300" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-        </div>
-        <h2 class="text-sm font-semibold text-stone-900 dark:text-white">New Election</h2>
-      </div>
-      <form onsubmit={handleCreate} class="space-y-4">
-        <div>
-          <label for="election_name" class="block text-xs font-semibold text-stone-500 dark:text-stone-400 tracking-wide uppercase mb-1.5">Election Name</label>
-          <input id="election_name" bind:value={newElection.name} placeholder="e.g. Student Council 2024" class="w-full bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-300 dark:placeholder-stone-600 focus:outline-none focus:border-stone-900 dark:focus:border-stone-400 focus:ring-[3px] focus:ring-stone-900/[0.06] dark:focus:ring-white/10 transition-all"/>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label for="start_date" class="block text-xs font-semibold text-stone-500 dark:text-stone-400 tracking-wide uppercase mb-1.5">Start</label>
-            <input id="start_date" type="datetime-local" bind:value={newElection.start_date} class="w-full bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl px-3 py-2.5 text-xs text-stone-900 dark:text-white focus:outline-none focus:border-stone-900 dark:focus:border-stone-400 transition-all"/>
-          </div>
-          <div>
-            <label for="end_date" class="block text-xs font-semibold text-stone-500 dark:text-stone-400 tracking-wide uppercase mb-1.5">End</label>
-            <input id="end_date" type="datetime-local" bind:value={newElection.end_date} class="w-full bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl px-3 py-2.5 text-xs text-stone-900 dark:text-white focus:outline-none focus:border-stone-900 dark:focus:border-stone-400 transition-all"/>
-          </div>
-        </div>
-        <button type="submit" disabled={isCreating} class="w-full rounded-xl py-2.5 text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-all" style="background-color: var(--text-main); color: var(--bg-main);">
-          {isCreating ? 'Creating...' : 'Create Election'}
+  <!-- Create Election Form (collapsible) -->
+  {#if showForm}
+    <div class="admin-card" style="padding:1.25rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+        <h2 style="font-size:0.875rem;font-weight:600;color:var(--text-main);">Create New Election</h2>
+        <button onclick={() => showForm = false} class="btn-icon">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
+      </div>
+      <form onsubmit={handleCreate} style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+        <div style="grid-column:1/-1;">
+          <label class="field-label" for="election_name">Election Name *</label>
+          <input id="election_name" class="input-base" bind:value={newElection.name} placeholder="e.g. Student Council 2025"/>
+        </div>
+        <div>
+          <label class="field-label" for="start_date">Start Date *</label>
+          <input id="start_date" type="datetime-local" class="input-base" bind:value={newElection.start_date}/>
+        </div>
+        <div>
+          <label class="field-label" for="end_date">End Date *</label>
+          <input id="end_date" type="datetime-local" class="input-base" bind:value={newElection.end_date}/>
+        </div>
+        <div style="grid-column:1/-1;">
+          <label class="field-label" for="description">Description</label>
+          <input id="description" class="input-base" bind:value={newElection.description} placeholder="Optional description"/>
+        </div>
+        <div style="grid-column:1/-1;display:flex;gap:0.5rem;justify-content:flex-end;margin-top:0.25rem;">
+          <button type="button" onclick={() => showForm = false} class="btn-secondary btn-sm">Cancel</button>
+          <button type="submit" disabled={isCreating} class="btn-primary btn-sm">
+            {isCreating ? 'Creating…' : 'Create Election'}
+          </button>
+        </div>
       </form>
     </div>
+  {/if}
 
-    <!-- Elections List -->
-    <div class="lg:col-span-2 bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-700 p-6 overflow-hidden">
-      <div class="flex items-center gap-3 mb-5">
-        <div class="w-9 h-9 bg-stone-100 dark:bg-stone-800 rounded-xl flex items-center justify-center">
-          <svg class="w-5 h-5 text-stone-600 dark:text-stone-300" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        </div>
-        <h2 class="text-sm font-semibold text-stone-900 dark:text-white">All Elections</h2>
-      </div>
-      <div class="space-y-3 overflow-y-auto max-h-[500px] pr-2 scrollbar-hide">
-        {#if isLoading}
-          <div class="py-12 flex items-center justify-center text-stone-400 dark:text-stone-500 text-sm animate-pulse">Loading elections...</div>
-        {:else if elections.length === 0}
-          <div class="py-12 flex flex-col items-center justify-center border-2 border-dashed border-stone-100 dark:border-stone-800 rounded-xl text-stone-400 dark:text-stone-500 text-sm italic">No elections found.</div>
-        {:else}
-          {#each elections as election}
-            <div class="flex items-center justify-between p-4 bg-stone-50 dark:bg-stone-800 rounded-xl border border-stone-100 dark:border-stone-700 hover:border-stone-200 dark:hover:border-stone-600 transition-all group">
-              <div>
-                <p class="font-medium text-stone-900 dark:text-white text-sm">{election.name}</p>
-                <div class="flex items-center gap-3 mt-1">
-                  <span class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide
-                    {election.status === 'active' ? 'text-emerald-600' : election.status === 'completed' ? 'text-stone-500 dark:text-stone-400' : 'text-amber-600'}">
-                    <span class="w-1.5 h-1.5 rounded-full {election.status === 'active' ? 'bg-emerald-500 animate-pulse' : election.status === 'completed' ? 'bg-stone-400' : 'bg-amber-400'}"></span>
-                    {election.status}
-                  </span>
-                  <span class="text-[10px] text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-stone-700 px-1.5 py-0.5 rounded italic">Ends {new Date(election.end_date).toLocaleDateString()}</span>
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                {#if election.status === 'upcoming'}
-                  <button onclick={() => toggleElection(election.id, election.status)} class="bg-stone-900 text-white hover:bg-stone-800 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase transition-all">Start</button>
-                {:else if election.status === 'active'}
-                  <button onclick={() => toggleElection(election.id, election.status)} class="bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase transition-all">End</button>
-                {/if}
-                <button onclick={() => deleteElection(election.id)} class="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100" title="Delete">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                </button>
-              </div>
-            </div>
-          {/each}
-        {/if}
-      </div>
+  <!-- Elections Table -->
+  <div class="admin-card" style="overflow:hidden;">
+    <div style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-main);display:flex;align-items:center;justify-content:space-between;">
+      <p class="section-label">{elections.length} Election{elections.length !== 1 ? 's' : ''}</p>
     </div>
-  </div>
-</div>
 
-<div class="fixed bottom-6 right-6 z-[60]">
+    {#if isLoading}
+      <div style="padding:1.5rem;display:flex;flex-direction:column;gap:0.5rem;">
+        {#each Array(4) as _}
+          <div class="skeleton" style="height:3rem;"></div>
+        {/each}
+      </div>
+    {:else if elections.length === 0}
+      <div class="empty-state">No elections yet. Click "New Election" to create one.</div>
+    {:else}
+      <div style="overflow-x:auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Status</th>
+              <th>Start Date</th>
+              <th>End Date</th>
+              <th>Voters</th>
+              <th>Turnout</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each elections as election (election.id)}
+              <tr>
+                <td style="font-weight:600;color:var(--text-main);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{election.name}</td>
+                <td><StatusBadge status={election.status} /></td>
+                <td style="color:var(--text-muted);white-space:nowrap;">{new Date(election.start_date).toLocaleDateString()}</td>
+                <td style="color:var(--text-muted);white-space:nowrap;">{new Date(election.end_date).toLocaleDateString()}</td>
+                <td style="color:var(--text-muted);">{election.voters_count ?? 0}</td>
+                <td>
+                  {#if election.voters_count}
+                    <span style="font-weight:600;color:var(--text-main);">{Math.round((election.votes_cast / election.voters_count) * 100)}%</span>
+                  {:else}
+                    <span style="color:var(--text-subtle);">—</span>
+                  {/if}
+                </td>
+                <td style="text-align:right;white-space:nowrap;">
+                  {#if election.status !== 'completed'}
+                    <button
+                      onclick={() => toggleElection(election.id, election.status)}
+                      class="{toggleVariant(election.status)}"
+                    >{toggleLabel(election.status)}</button>
+                  {/if}
+                  <button onclick={() => deleteElection(election.id)} class="btn-icon-danger" title="Delete election" style="margin-left:0.25rem;">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+                  </button>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {/if}
+  </div>
+</GlassCard>
+
+<div style="position:fixed;bottom:1.5rem;right:1.5rem;z-index:110;">
   <Notification text={notification.text} type={notification.type} />
 </div>

@@ -1,7 +1,7 @@
 import { authSession } from './stores/auth.js';
 import { voterSession } from './stores/session.js';
 
-const BASE = 'http://localhost:8000';
+export const BASE = 'http://localhost:8000';
 
 // Tokens are now resolved dynamically per-request to avoid cross-role collisions
 
@@ -29,17 +29,20 @@ async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, mergedOptions);
   const data = await res.json().catch(() => null);
   
-  if (!res.ok) {
-    let message = data?.message ?? `Request failed: ${res.status}`;
-    if (data?.detail) {
-      if (typeof data.detail === 'string') {
-        message = data.detail;
-      } else if (Array.isArray(data.detail)) {
-        message = data.detail.map((/** @type {any} */ err) => err.msg || JSON.stringify(err)).join(', ');
+    if (!res.ok) {
+      let message = data?.message ?? `Request failed: ${res.status}`;
+      if (data?.detail) {
+        if (typeof data.detail === 'string') {
+          message = data.detail;
+        } else if (Array.isArray(data.detail)) {
+          message = data.detail.map((/** @type {any} */ err) => err.msg || JSON.stringify(err)).join(', ');
+        }
       }
+      const error = new Error(message);
+      // @ts-ignore
+      if (data?.retry_after) error.retryAfter = data.retry_after;
+      throw error;
     }
-    throw new Error(message);
-  }
   return data;
 }
 
@@ -60,8 +63,8 @@ export const auth = {
    * @param {string} email
    * @param {string} password
    */
-  login: (email, password) =>
-    request('/api/auth/login', json({ email, password })),
+  login: (id, password) =>
+    request('/api/auth/login', json({ username: id, password })),
 
   /**
    * @param {object} payload
@@ -71,8 +74,10 @@ export const auth = {
    * @param {string} payload.role
    * @param {string} [payload.department]
    */
-  register: (payload) =>
-    request('/api/auth/register', json(payload)),
+  register: (payload) => {
+    const { id, ...rest } = payload;
+    return request('/api/auth/register', json({ username: id, ...rest }));
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -87,9 +92,23 @@ export const student = {
    * @param {string} student_id
    * @param {string} election_id
    * @param {Array<{candidate_id: string, position: string}>} votes
+   * @param {string} voting_pin
    */
-  vote: (student_id, election_id, votes) =>
-    request('/api/student/vote', { ...json({ student_id, election_id, votes }), method: 'POST' }),
+  vote: (student_id, election_id, votes, voting_pin) =>
+    request('/api/student/vote', { ...json({ student_id, election_id, votes, voting_pin }), method: 'POST' }),
+
+  /**
+   * @param {string} election_id
+   * @param {string} passcode
+   */
+  verifyPasscode: (election_id, passcode) =>
+    request('/api/student/verify-passcode', json({ election_id, passcode })),
+
+  /**
+   * @param {string} student_id
+   */
+  getVotingPin: (student_id) =>
+    request(`/api/student/voting-pin?student_id=${student_id}`),
 
   /** @param {string} election_id */
   getCandidates: (election_id) =>
@@ -143,7 +162,7 @@ export const admin = {
    * @param {object} payload
    * @param {string} payload.student_id
    * @param {string} payload.full_name
-   * @param {string} [payload.course]
+   * @param {string} [payload.program]
    * @param {number} [payload.year_level]
    */
   addStudent: (payload) =>
@@ -228,6 +247,10 @@ export const adviser = {
   /** @param {string} candidate_id */
   deleteCandidate: (candidate_id) =>
     request(`/api/adviser/candidates/${candidate_id}`, { method: 'DELETE' }),
+
+  /** @param {string} election_id */
+  refreshPasscode: (election_id) =>
+    request(`/api/adviser/elections/${election_id}/refresh-passcode`, { method: 'POST' }),
 
   /** @param {number} [limit] */
   getAuditLog: (limit) =>

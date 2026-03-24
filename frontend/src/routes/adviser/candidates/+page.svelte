@@ -1,10 +1,9 @@
 <script>
 	import { onMount } from 'svelte';
 	import { admin, adviser } from '$lib/api.js';
-	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
+	import GlassCard from '$lib/components/GlassCard.svelte';
 	import { selectedElectionId } from '$lib/stores/election.js';
 	import { POSITION_ORDER, sortPositions } from '$lib/constants.js';
-	import { fly } from 'svelte/transition';
 	
 	/** @type {any[]} */
 	let elections = $state([]);
@@ -75,11 +74,6 @@
 		}
 	}
 
-	/** @param {string} name */
-	function getMonogram(name) {
-		return (name || '??').split(' ').slice(0, 2).map(/** @param {string} w */ w => w[0]?.toUpperCase() || '').join('');
-	}
-
 	// Group candidates by position and sort the positions
 	const groupedCandidates = $derived(() => {
 		/** @type {Record<string, any[]>} */
@@ -90,13 +84,10 @@
 			g[pos].push(c);
 		});
 		
-		// Sort the keys of the grouped object
 		const sortedKeys = sortPositions(Object.keys(g));
 		/** @type {Record<string, any[]>} */
 		const sortedG = {};
-		sortedKeys.forEach(key => {
-			sortedG[key] = g[key];
-		});
+		sortedKeys.forEach(key => { sortedG[key] = g[key]; });
 		return sortedG;
 	});
 
@@ -116,164 +107,110 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Candidates Management | UniVote</title>
-</svelte:head>
+<svelte:head><title>Candidates | UniVote</title></svelte:head>
 
-<div class="max-w-5xl mx-auto px-5 md:px-8 py-8 space-y-6">
-	<!-- Header -->
-	<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-		<div>
-			<p class="text-[10px] font-semibold text-stone-400 dark:text-stone-500 tracking-widest uppercase mb-1">Adviser</p>
-			<h1 class="text-2xl font-semibold text-stone-900 dark:text-white">Candidates</h1>
-			<p class="text-stone-500 dark:text-stone-400 text-sm mt-0.5">Enlist and manage official candidates for the selected election.</p>
-		</div>
-
-		<div class="flex items-center gap-3 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl px-4 py-2.5 w-fit">
-			<label for="election-select" class="text-[10px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-widest whitespace-nowrap">Election</label>
+<GlassCard title="Candidates" subtitle="Election Configuration">
+	{#snippet headerExtra()}
+		<div style="display:flex;align-items:center;gap:0.75rem;">
+			<label for="election-select" class="field-label" style="margin-bottom:0;line-height:1;">Election</label>
 			<select 
 				id="election-select"
 				bind:value={$selectedElectionId}
-				class="bg-transparent border-none text-sm font-semibold text-stone-900 dark:text-white focus:outline-none cursor-pointer min-w-[180px]"
+				class="input-base"
+				style="width:220px;padding:0.375rem 0.75rem;font-size:0.8125rem;"
 			>
-				<option value="" disabled>Select election</option>
+				<option value="" disabled>Select Election...</option>
 				{#each elections as election}
 					<option value={election.id}>{election.name}</option>
 				{/each}
 			</select>
 		</div>
-	</div>
+	{/snippet}
 
 	{#if !$selectedElectionId}
-		<div class="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-stone-200 dark:border-stone-700 rounded-2xl">
-			<div class="w-14 h-14 bg-stone-100 dark:bg-stone-800 rounded-2xl flex items-center justify-center mb-4">
-				<svg class="w-7 h-7 text-stone-400 dark:text-stone-500" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-			</div>
-			<h2 class="font-semibold text-stone-900 dark:text-white mb-1">No Election Selected</h2>
-			<p class="text-stone-400 dark:text-stone-500 text-sm max-w-xs">Select an election from the dropdown above to view and manage candidates.</p>
-		</div>
+		<div class="empty-state">Please select an election from the dropdown above to manage candidates.</div>
 	{:else}
-		<div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
-			<!-- Enlistment Form -->
-			<div class="lg:col-span-4">
-				<div class="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-700 p-6 sticky top-6">
-					<div class="flex items-center gap-3 mb-5">
-						<div class="w-9 h-9 bg-stone-100 dark:bg-stone-800 rounded-xl flex items-center justify-center">
-							<svg class="w-4 h-4 text-stone-600 dark:text-stone-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
-						</div>
-						<h2 class="text-sm font-semibold text-stone-900 dark:text-white">Enlist Candidate</h2>
+		<div class="bento-grid" style="grid-template-columns: 1fr 2.5fr; gap: 1rem;">
+			<!-- Add Candidate Form -->
+			<div class="admin-card" style="padding:1.25rem;height:fit-content;">
+				<div style="margin-bottom:1.25rem;">
+					<h2 style="font-size:0.875rem;font-weight:600;color:var(--text-main);">Add Candidate</h2>
+				</div>
+
+				<form onsubmit={handleAddCandidate} style="display:flex;flex-direction:column;gap:1rem;">
+					<div>
+						<label class="field-label" for="student-id">Student ID *</label>
+						<input id="student-id" type="text" bind:value={newCandidate.student_id} class="input-base" placeholder="e.g. 2021-00123" />
 					</div>
 
-					<form onsubmit={handleAddCandidate} class="space-y-4">
+					<div>
+						<label class="field-label" for="position">Position *</label>
+						<select id="position" bind:value={newCandidate.position} class="input-base">
+							<option value="" disabled>Select Role...</option>
+							{#each POSITION_ORDER as pos}
+								<option value={pos}>{pos}</option>
+							{/each}
+							<option value="Other">Other (Custom)</option>
+						</select>
+					</div>
+
+					{#if newCandidate.position === 'Other'}
 						<div>
-							<label class="block text-xs font-semibold text-stone-500 dark:text-stone-400 tracking-wide uppercase mb-1.5" for="student-id">Student ID</label>
-							<input id="student-id" type="text" bind:value={newCandidate.student_id} placeholder="e.g. 2021-00123" class="input-base font-mono"/>
-							<p class="text-[10px] text-stone-400 dark:text-stone-500 mt-1">Must exist in the voter database.</p>
+							<label class="field-label" for="custom-position">Custom Position</label>
+							<input id="custom-position" type="text" bind:value={customPosition} class="input-base" placeholder="e.g. Sgt. at Arms" />
 						</div>
+					{/if}
 
-						<div>
-							<label class="block text-xs font-semibold text-stone-500 dark:text-stone-400 tracking-wide uppercase mb-1.5" for="position">Position</label>
-							<select id="position" bind:value={newCandidate.position} class="input-base cursor-pointer">
-								<option value="" disabled>Choose position...</option>
-								{#each POSITION_ORDER as pos}
-									<option value={pos}>{pos}</option>
-								{/each}
-								<option value="Other">Other (Custom)</option>
-							</select>
-						</div>
+					<div>
+						<label class="field-label" for="party">Partylist</label>
+						<select id="party" bind:value={newCandidate.partylist_id} class="input-base">
+							<option value="">Independent</option>
+							{#each partylists as party}
+								<option value={party.id}>{party.name}</option>
+							{/each}
+						</select>
+					</div>
 
-						{#if newCandidate.position === 'Other'}
-							<div in:fly={{ y: -10, duration: 200 }}>
-								<label class="block text-xs font-semibold text-stone-500 dark:text-stone-400 tracking-wide uppercase mb-1.5" for="custom-position">Type Position Name</label>
-								<input id="custom-position" type="text" bind:value={customPosition} placeholder="e.g. Sgt. at Arms" class="input-base"/>
-							</div>
-						{/if}
+					{#if errorMessage}
+						<div style="color:var(--status-danger-fg);font-size:0.75rem;padding:0.5rem;background:var(--status-danger-bg);border-radius:4px;">{errorMessage}</div>
+					{/if}
+					{#if successMessage}
+						<div style="color:var(--status-success-fg);font-size:0.75rem;padding:0.5rem;background:var(--status-success-bg);border-radius:4px;">{successMessage}</div>
+					{/if}
 
-						<div>
-							<label class="block text-xs font-semibold text-stone-500 dark:text-stone-400 tracking-wide uppercase mb-1.5" for="party">Partylist</label>
-							<select id="party" bind:value={newCandidate.partylist_id} class="input-base cursor-pointer">
-								<option value="">Independent</option>
-								{#each partylists as party}
-									<option value={party.id}>{party.name}</option>
-								{/each}
-							</select>
-						</div>
-
-						{#if errorMessage}
-							<div class="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2">
-								<svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
-								{errorMessage}
-							</div>
-						{/if}
-
-						{#if successMessage}
-							<div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold flex items-center gap-2">
-								<svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-								{successMessage}
-							</div>
-						{/if}
-
-						<button type="submit" disabled={isSubmitting} class="w-full rounded-xl py-2.5 text-sm font-semibold hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2" style="background-color: var(--text-main); color: var(--bg-main);">
-							{#if isSubmitting}
-								<LoadingSpinner />
-								Adding...
-							{:else}
-								<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-								Enlist Candidate
-							{/if}
-						</button>
-					</form>
-				</div>
+					<button type="submit" disabled={isSubmitting || !isModifiable()} class="btn-primary" style="margin-top:0.5rem;">
+						{isSubmitting ? 'Adding...' : 'Add Candidate'}
+					</button>
+				</form>
 			</div>
 
-			<!-- Candidate Roster -->
-			<div class="lg:col-span-8 space-y-5">
-				<div class="flex items-center justify-between">
-				<h2 class="text-sm font-semibold text-stone-900 dark:text-white">Official Roster</h2>
-					<span class="text-xs font-semibold text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-stone-800 px-3 py-1 rounded-lg">{candidates.length} registered</span>
+			<!-- Candidates List -->
+			<div class="admin-card" style="padding:1.5rem;display:flex;flex-direction:column;gap:1.5rem;">
+				<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-subtle);padding-bottom:0.75rem;">
+					<h2 style="font-size:0.875rem;font-weight:600;color:var(--text-main);">Registered Candidates</h2>
+					<span class="pill pill-neutral">{candidates.length} candidates</span>
 				</div>
 
 				{#if candidates.length === 0}
-					<div class="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-stone-200 dark:border-stone-700 rounded-2xl">
-						<div class="w-12 h-12 bg-stone-100 dark:bg-stone-800 rounded-2xl flex items-center justify-center mb-3">
-							<svg class="w-6 h-6 text-stone-300 dark:text-stone-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-						</div>
-						<p class="font-semibold text-stone-600 dark:text-stone-300 text-sm">No candidates yet</p>
-						<p class="text-stone-400 dark:text-stone-500 text-xs mt-0.5">Use the form to enlist the first candidate.</p>
-					</div>
+					<div class="empty-state" style="border:none;">No candidates registered for this election yet.</div>
 				{:else}
 					{#each Object.entries(groupedCandidates()) as [position, list]}
-						<div class="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-700 overflow-hidden">
-							<div class="px-5 py-3 border-b border-stone-100 dark:border-stone-700 flex items-center justify-between bg-stone-50 dark:bg-stone-800/50">
-								<div class="flex items-center gap-2">
-									<div class="w-6 h-6 bg-stone-200 dark:bg-stone-700 rounded-md flex items-center justify-center">
-										<svg class="w-3 h-3 text-stone-600 dark:text-stone-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-									</div>
-									<h3 class="text-sm font-semibold text-stone-900 dark:text-white capitalize">{position}</h3>
-								</div>
-								<span class="text-[10px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-widest">{list.length} candidate{list.length !== 1 ? 's' : ''}</span>
-							</div>
-
-							<div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+						<div>
+							<h3 class="section-label" style="margin-bottom:0.75rem;">{position} ({list.length})</h3>
+							<div class="bento-grid bento-2col" style="gap:0.75rem;">
 								{#each list as candidate}
 									{@const name = candidate.students?.full_name || 'Unknown'}
-									{@const partyName = candidate.partylist_id ? (partylists.find(/** @param {any} p */ p => p.id === candidate.partylist_id)?.name || 'Unknown Party') : 'Independent'}
-									<div class="flex items-center gap-3.5 p-4 rounded-xl bg-stone-50 dark:bg-stone-800 border border-stone-100 dark:border-stone-700 hover:bg-white dark:hover:bg-stone-700 hover:border-stone-300 transition-all">
-										<div class="w-10 h-10 bg-stone-200 dark:bg-stone-700 text-stone-700 dark:text-stone-200 rounded-xl flex items-center justify-center font-semibold text-sm shrink-0">
-											{getMonogram(name)}
+									{@const partyName = candidate.partylist_id ? (partylists.find(p => p.id === candidate.partylist_id)?.name || 'Unknown Partylist') : 'Independent'}
+									<div class="profile-card" style="padding:0.75rem 1rem;display:flex;align-items:center;gap:1rem;border-color:var(--border-subtle);box-shadow:none;">
+										<div class="avatar-initial" style="width:36px;height:36px;flex-shrink:0;">
+											{(name || '??').split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('')}
 										</div>
-										<div class="flex-1 min-w-0">
-											<p class="font-semibold text-stone-900 dark:text-white text-sm truncate">{name}</p>
-											<p class="text-[10px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide mt-0.5 truncate">{partyName}</p>
-											<p class="text-[10px] font-mono text-stone-400 dark:text-stone-500 mt-0.5">{candidate.students?.student_id}</p>
+										<div style="flex:1;min-width:0;">
+											<p style="font-size:0.8125rem;font-weight:600;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title={name}>{name}</p>
+											<p style="font-size:0.6875rem;color:var(--text-muted);margin-top:0.125rem;">{partyName}</p>
 										</div>
-
 										{#if isModifiable()}
-											<button 
-												onclick={() => handleDeleteCandidate(candidate.id)} 
-												class="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-												title="Delete Candidate"
-											>
+											<button onclick={() => handleDeleteCandidate(candidate.id)} class="btn-icon-danger flex-shrink-0" title="Remove candidate">
 												<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
 											</button>
 										{/if}
@@ -286,4 +223,4 @@
 			</div>
 		</div>
 	{/if}
-</div>
+</GlassCard>

@@ -4,9 +4,9 @@
 
   /** @type {Record<'info' | 'success' | 'error', string>} */
   const styles = {
-    info:    'bg-slate-800 border-slate-700 text-white',
-    success: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
-    error:   'bg-rose-500/10 border-rose-500/30 text-rose-400',
+    info:    'bg-[var(--status-info-bg)] border-[var(--status-info-fg)]/30 text-[var(--status-info-fg)]',
+    success: 'bg-[var(--status-success-bg)] border-[var(--status-success-fg)]/30 text-[var(--status-success-fg)]',
+    error:   'bg-[var(--status-danger-bg)] border-[var(--status-danger-fg)]/30 text-[var(--status-danger-fg)]',
   };
 </script>
 

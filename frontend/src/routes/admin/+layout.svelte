@@ -30,7 +30,7 @@
     {@render children()}
   </Sidebar>
 {:else}
-  <div class="min-h-screen flex items-center justify-center bg-slate-950">
+  <div class="min-h-screen flex items-center justify-center bg-surface-main">
     <div class="h-8 w-8 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin"></div>
   </div>
 {/if}

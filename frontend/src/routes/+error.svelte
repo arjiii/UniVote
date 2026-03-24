@@ -30,7 +30,7 @@
 	<title>{status} | UniVote Error</title>
 </svelte:head>
 
-<div class="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
+<div class="min-h-screen bg-surface-main flex items-center justify-center p-6 font-sans">
 	<div class="max-w-md w-full text-center space-y-8 animate-in fade-in zoom-in duration-700">
 		<!-- Brand Header -->
 		<div class="flex justify-center mb-8">
@@ -38,37 +38,37 @@
 		</div>
 
 		<!-- Main Error Content -->
-		<div class="bg-white rounded-[40px] p-12 shadow-2xl shadow-slate-200 border border-slate-100 relative overflow-hidden group">
+		<div class="bg-surface-card rounded-[40px] p-12 shadow-2xl border border-line-subtle relative overflow-hidden group">
 			<!-- Animated Background Element -->
-			<div class="absolute -top-24 -right-24 w-48 h-48 bg-slate-50 rounded-full group-hover:scale-110 transition-transform duration-700"></div>
+			<div class="absolute -top-24 -right-24 w-48 h-48 bg-surface-main rounded-full group-hover:scale-110 transition-transform duration-700"></div>
 			
 			<div class="relative">
 				<!-- Status Badge -->
-				<div class="inline-flex items-center px-4 py-1.5 rounded-full bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest mb-6 shadow-lg shadow-slate-900/20">
+				<div class="inline-flex items-center px-4 py-1.5 rounded-full bg-content-main text-surface-main text-[10px] font-black uppercase tracking-widest mb-6 shadow-lg">
 					Error Protocol {status}
 				</div>
 
 				<!-- Icon -->
 				<div class="mb-6 flex justify-center">
-					<div class="h-20 w-20 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-400 group-hover:text-slate-600 transition-colors duration-500">
+					<div class="h-20 w-20 bg-surface-elevated border border-line-main rounded-3xl flex items-center justify-center text-content-subtle group-hover:text-content-muted transition-colors duration-500">
 						<svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d={details.icon}></path>
 						</svg>
 					</div>
 				</div>
 
-				<h1 class="text-3xl font-bold text-slate-900 tracking-tight mb-3">
+				<h1 class="text-3xl font-bold text-content-main tracking-tight mb-3">
 					{details.title}
 				</h1>
 				
-				<p class="text-slate-500 font-medium leading-relaxed mb-8">
+				<p class="text-content-muted font-medium leading-relaxed mb-8">
 					{details.subtitle}
 				</p>
 
 				<div class="flex flex-col gap-3">
 					<a 
 						href="/" 
-						class="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10 active:scale-95 flex items-center justify-center gap-2 group/btn"
+						class="w-full btn-primary !py-4 !rounded-2xl shadow-xl flex items-center justify-center gap-2 group/btn"
 					>
 						<span>Return to Dashboard</span>
 						<svg class="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,7 +88,7 @@
 
 		<!-- System Footer -->
 		<div class="pt-4">
-			<p class="text-[10px] font-black uppercase tracking-widest text-slate-300">
+			<p class="text-[10px] font-black uppercase tracking-widest text-content-subtle">
 				UniVote Automated Recovery Service • v0.0.1
 			</p>
 		</div>
@@ -97,7 +97,7 @@
 
 <style>
 	:global(body) {
-		background-color: #f8fafc; /* slate-50 */
+		background-color: var(--bg-main);
 		overflow: hidden;
 	}
 </style>

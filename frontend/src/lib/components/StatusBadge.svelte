@@ -1,30 +1,19 @@
 <script>
-  /** @type {{ status: 'upcoming' | 'active' | 'completed' | 'closed' | boolean }} */
-  let { status } = $props();
+  /** @type {{ status: string, dot?: boolean }} */
+  let { status, dot = true } = $props();
 
-  /** @type {Record<string, string>} */
-  const styles = {
-    active:    'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-    upcoming:  'bg-slate-500/10  text-slate-400   border-slate-500/30',
-    completed: 'bg-violet-500/10 text-violet-400  border-violet-500/30',
-    closed:    'bg-rose-500/10   text-rose-400    border-rose-500/30',
+  const config = {
+    active:    { label: 'Active',    cls: 'pill-success' },
+    completed: { label: 'Completed', cls: 'pill-neutral' },
+    upcoming:  { label: 'Upcoming',  cls: 'pill-info'    },
+    paused:    { label: 'Paused',    cls: 'pill-warning' },
+    voted:     { label: 'Voted',     cls: 'pill-success' },
+    pending:   { label: 'Pending',   cls: 'pill-warning' },
+    cancelled: { label: 'Cancelled', cls: 'pill-danger'  },
+    draft:     { label: 'Draft',     cls: 'pill-neutral' },
   };
 
-  /** @type {Record<string, string>} */
-  const labels = {
-    active: 'Live', upcoming: 'Upcoming', completed: 'Completed', closed: 'Closed',
-  };
-
-  // $derived re-evaluates reactively whenever `status` changes
-  const normalized = $derived(
-    typeof status === 'boolean' ? (status ? 'active' : 'upcoming') : status
-  );
+  const cfg = $derived(config[status?.toLowerCase()] ?? { label: status, cls: 'pill-neutral' });
 </script>
 
-<span
-  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border
-         {styles[normalized] ?? styles.upcoming}"
->
-  <span class="h-1.5 w-1.5 rounded-full bg-current {normalized === 'active' ? 'animate-pulse' : ''}"></span>
-  {labels[normalized] ?? normalized}
-</span>
+<span class="pill {cfg.cls} {dot ? 'pill-dot' : ''}">{cfg.label}</span>

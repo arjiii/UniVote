@@ -1,8 +1,8 @@
 from typing import Optional
-from database import supabase
+from database import get_async_supabase
 
 
-def log_action(
+async def log_action(
     actor_id: str,
     actor_role: str,
     action: str,
@@ -16,7 +16,8 @@ def log_action(
     Failures are silently swallowed so audit errors never break the main flow.
     """
     try:
-        supabase.table("audit_log").insert({
+        supabase = await get_async_supabase()
+        await supabase.table("audit_log").insert({
             "actor_id": actor_id,
             "actor_role": actor_role,
             "action": action,
@@ -29,9 +30,10 @@ def log_action(
         print(f"[audit_service] Failed to log action '{action}': {exc}")
 
 
-def get_audit_log(limit: int = 100) -> list:
+async def get_audit_log(limit: int = 100) -> list:
     """Retrieve the most recent audit log entries, newest first."""
-    result = (
+    supabase = await get_async_supabase()
+    result = await (
         supabase.table("audit_log")
         .select("*")
         .order("created_at", desc=True)
