@@ -36,7 +36,7 @@ async def cast_vote(
     ]
     result = await student_service.cast_votes(
         student_id=vote_submit.student_id,
-        election_id=str(vote_submit.election_id),
+        election_id=vote_submit.election_id,
         votes=votes_payload,
         voting_pin=vote_submit.voting_pin,
     )

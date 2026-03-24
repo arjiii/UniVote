@@ -1,6 +1,6 @@
 from fastapi import HTTPException
 from database import get_async_supabase
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 
@@ -47,7 +47,6 @@ async def create_election(name: str, start_date: str, end_date: str, description
 async def update_election_status(election_id: str, status: str) -> list:
     payload = {"status": status}
     if status == "completed":
-        from datetime import timezone
         payload["ended_at"] = datetime.now(timezone.utc).isoformat()
         
     supabase = await get_async_supabase()

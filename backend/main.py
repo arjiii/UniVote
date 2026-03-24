@@ -1,3 +1,7 @@
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -7,6 +11,8 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from limiter import limiter
 from routes import admin, adviser, student, auth as auth_router, results as results_router
+
+from config import ALLOWED_ORIGINS
 
 app = FastAPI(title="UniVote API")
 app.state.limiter = limiter
@@ -52,14 +58,17 @@ async def universal_exception_handler(request: Request, exc: Exception):
         content={"message": "An internal server error occurred.", "detail": str(exc)},
     )
 
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Tighten in production
+    allow_origins=ALLOWED_ORIGINS,  # Loaded from environment
+
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["Content-Type"],
 )
+
 
 # Public: no auth required
 app.include_router(results_router.router, prefix="/api/results", tags=["results"])

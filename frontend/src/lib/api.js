@@ -1,7 +1,7 @@
 import { authSession } from './stores/auth.js';
 import { voterSession } from './stores/session.js';
 
-export const BASE = 'http://localhost:8000';
+export const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 // Tokens are now resolved dynamically per-request to avoid cross-role collisions
 

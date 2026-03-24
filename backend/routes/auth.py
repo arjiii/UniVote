@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Request
 from database import get_async_supabase
 from passlib.hash import argon2
-from datetime import datetime, timedelta
+from datetime import timedelta
 from deps import create_access_token, get_current_user, AuthUser
 from models import LoginRequest, RegisterRequest
 from limiter import limiter

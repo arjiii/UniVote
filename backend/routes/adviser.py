@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends
 from models import PartylistCreate, CandidateCreate
-from services import adviser_service
-from services import audit_service
+from services import adviser_service, audit_service
 from deps import require_adviser, AuthUser
 
 router = APIRouter()

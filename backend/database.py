@@ -1,5 +1,5 @@
 import os
-import httpx
+from typing import Optional
 from dotenv import load_dotenv
 from supabase import create_client, Client, create_async_client, AsyncClient
 from supabase.client import ClientOptions
@@ -25,7 +25,7 @@ supabase: Client = create_client(
     options=options
 )
 
-_async_supabase: AsyncClient = None
+_async_supabase: Optional[AsyncClient] = None
 
 async def get_async_supabase() -> AsyncClient:
     global _async_supabase
