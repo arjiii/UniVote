@@ -150,31 +150,33 @@ async def cast_votes(
         rpc_result = await supabase.rpc(
             "cast_ballot_v2",
             {
-                "election_id_param": election_id,
-                "student_uuid_param": student_uuid,
+                "election_id_param": str(election_id),
+                "student_uuid_param": str(student_uuid),
                 "votes_json": votes,
             },
         ).execute()
 
         data = rpc_result.data
+        result_dict = {}
         if isinstance(data, list) and len(data) > 0:
-            # IMPORTANT: Invalidate the PIN immediately after a successful vote
-            await (
-                supabase.table("students")
-                .update({"voting_pin": None})
-                .eq("id", student_uuid)
-                .execute()
-            )
-            return data[0]
+            result_dict = data[0]
+        elif isinstance(data, dict):
+            result_dict = data
 
-        if data:
-            await (
-                supabase.table("students")
-                .update({"voting_pin": None})
-                .eq("id", student_uuid)
-                .execute()
-            )
-        return data or {}
+        # Ensure we always have a receipt_id and vote_count for the frontend
+        if not result_dict.get("receipt_id"):
+            result_dict["receipt_id"] = _generate_receipt_id(str(student_uuid), str(election_id))
+        if "vote_count" not in result_dict:
+            result_dict["vote_count"] = len(votes)
+
+        # IMPORTANT: Invalidate the PIN immediately after a successful vote
+        await (
+            supabase.table("students")
+            .update({"voting_pin": None})
+            .eq("id", student_uuid)
+            .execute()
+        )
+        return result_dict
     except Exception as e:
         error_msg = str(e)
         if "already_voted" in error_msg.lower() or "duplicate key" in error_msg.lower():

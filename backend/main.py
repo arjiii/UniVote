@@ -30,6 +30,7 @@ from routes import (
 
 from config import ALLOWED_ORIGINS
 
+
 app = FastAPI(title="UniVote API")
 app.state.limiter = limiter
 
