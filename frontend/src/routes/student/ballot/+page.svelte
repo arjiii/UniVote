@@ -1,476 +1,547 @@
 <script>
-  import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
-  import { student as studentApi } from '$lib/api.js';
-  import { voterSession } from '$lib/stores/session.js';
-  import { page } from '$app/state';
-  import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
-  import { fade, fly, scale } from 'svelte/transition';
-  import { elasticOut } from 'svelte/easing';
-  import { sortPositions } from '$lib/constants.js';
-  import GlassCard from '$lib/components/GlassCard.svelte';
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { student as studentApi } from '$lib/api.js';
+	import { voterSession } from '$lib/stores/session.js';
+	import { page } from '$app/state';
+	import { fade, fly, scale } from 'svelte/transition';
+	import { elasticOut } from 'svelte/easing';
+	import { sortPositions } from '$lib/constants.js';
 
-  let isSubmitting = $state(false);
-  let hasSubmitted = $state(false);
-  let isLoading = $state(true);
-  let errorMessage = $state('');
-  let showConfirm = $state(false);
-  let toastMessage = $state('');
-  let toastVisible = $state(false);
-  let alreadyVoted = $state(false);
-  let electionId = $state('');
-  let receiptId = $state('');
-  
-  let isAuthorized = $state(false);
-  let adviserPasscode = $state('');
-  let votingPin = $state('');
-  let showPin = $state(false);
-  let pinConfirmInput = $state('');
-  let isVerifyingPasscode = $state(false);
-  let retrySeconds = $state(0);
+	let isSubmitting = $state(false);
+	let hasSubmitted = $state(false);
+	let isLoading = $state(true); // Always start true as we fetch specific election data
+	let errorMessage = $state('');
+	let showConfirm = $state(false);
+	let alreadyVoted = $state(false);
+	let electionId = $state('');
+	let receiptId = $state('');
 
-  /** @type {Record<string, any[]>} */
-  let candidatesGrouped = $state({});
-  /** @type {Record<string, string | null>} */
-  let selectedVotes = $state({});
-  
-  let voterName = $state('');
-  let electionName = $state('');
+	let isAuthorized = $state(false);
+	let adviserPasscode = $state('');
+	let votingPin = $state('');
+	let showPin = $state(false);
+	let pinConfirmInput = $state('');
+	let isVerifyingPasscode = $state(false);
 
-  /** @type {string[]} */
-  const positionOrder = $derived(sortPositions(Object.keys(candidatesGrouped)));
-  const selectedCount = $derived(Object.values(selectedVotes).filter(v => v).length);
-  const totalPositions = $derived(positionOrder.length);
-  const progressPercent = $derived(totalPositions > 0 ? Math.round((selectedCount / totalPositions) * 100) : 0);
-  const allSelected = $derived(selectedCount === totalPositions && totalPositions > 0);
+	/** @type {Record<string, any[]>} */
+	let candidatesGrouped = $state({});
+	/** @type {Record<string, string | null>} */
+	let selectedVotes = $state({});
 
-  /** @param {string} name */
-  function getMonogram(name) {
-    return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('');
-  }
+	let voterName = $derived($voterSession?.full_name || 'Voter');
+	let electionName = $state('');
 
-  /** @return {Array<{position: string, candidate: any}>} */
-  function getReviewList() {
-    return positionOrder
-      .filter(pos => selectedVotes[pos])
-      .map(pos => ({
-        position: pos,
-        candidate: (candidatesGrouped[pos] || []).find(c => c.id === selectedVotes[pos])
-      }))
-      .filter(r => r.candidate);
-  }
+	/** @type {string[]} */
+	const positionOrder = $derived(sortPositions(Object.keys(candidatesGrouped)));
+	const selectedCount = $derived(Object.values(selectedVotes).filter((v) => v).length);
+	const totalPositions = $derived(positionOrder.length);
+	const allSelected = $derived(selectedCount === totalPositions && totalPositions > 0);
 
-  /** @param {string} msg */
-  function showToast(msg) {
-    toastMessage = msg;
-    toastVisible = true;
-    setTimeout(() => { toastVisible = false; }, 3500);
-  }
+	/** @param {string} name */
+	function getMonogram(name) {
+		return name
+			.split(' ')
+			.slice(0, 2)
+			.map((w) => w[0]?.toUpperCase() || '')
+			.join('');
+	}
 
-  onMount(() => {
-    const session = $voterSession;
-    if (!session) { goto('/student/validate'); return; }
-    voterName = session?.full_name || 'Voter';
-  });
+	function getReviewList() {
+		return positionOrder
+			.filter((pos) => selectedVotes[pos])
+			.map((pos) => ({
+				position: pos,
+				candidate: (candidatesGrouped[pos] || []).find((c) => c.id === selectedVotes[pos])
+			}))
+			.filter((r) => r.candidate);
+	}
 
-  $effect(() => {
-    const session = $voterSession;
-    if (!session) return;
+	onMount(() => {
+		if (!$voterSession) {
+			goto('/student/validate');
+		}
+	});
 
-    const id = page.url.searchParams.get('election') || '';
-    electionId = id;
+	$effect(() => {
+		const session = $voterSession;
+		if (!session) return;
 
-    if (!id) {
-      isLoading = false;
-      alreadyVoted = false;
-      candidatesGrouped = {};
-      selectedVotes = {};
-      errorMessage = '';
-      return;
-    }
+		const id = page.url.searchParams.get('election') || '';
+		electionId = id;
 
-    isLoading = true;
-    alreadyVoted = false;
-    hasSubmitted = false;
-    errorMessage = '';
-    candidatesGrouped = {};
-    selectedVotes = {};
+		if (!id) {
+			isLoading = false;
+			alreadyVoted = false;
+			candidatesGrouped = {};
+			selectedVotes = {};
+			return;
+		}
 
-    const electionInfo = (session.elections || []).find(/** @param {any} e */ e => e.id === id);
-    electionName = electionInfo?.name || 'Election';
+		isLoading = true;
+		alreadyVoted = false;
+		hasSubmitted = false;
+		errorMessage = '';
 
-    if (electionInfo?.has_voted) {
-      alreadyVoted = true;
-      isLoading = false;
-      return;
-    }
+		const electionInfo = (session.elections || []).find((e) => e.id === id);
+		electionName = electionInfo?.name || 'Election';
 
-    studentApi.getCandidates(id).then(res => {
-      const data = res.data || [];
-      /** @type {Record<string, any[]>} */
-      const grouped = {};
-      data.forEach(/** @param {any} c */ c => {
-        if (!grouped[c.position]) grouped[c.position] = [];
-        grouped[c.position].push({ id: c.id, name: c.students?.full_name || 'Unknown', party: c.partylists?.name || 'Independent' });
-      });
-      candidatesGrouped = grouped;
-      const initialVotes = /** @type {Record<string, null>} */ ({});
-      Object.keys(grouped).forEach(pos => { initialVotes[pos] = null; });
-      selectedVotes = initialVotes;
-    }).catch(() => {
-      errorMessage = 'Failed to load the ballot. Please contact an administrator.';
-    }).finally(() => {
-      isLoading = false;
-    });
-  });
+		if (electionInfo?.has_voted) {
+			alreadyVoted = true;
+			isLoading = false;
+			return;
+		}
 
-  $effect(() => {
-    if (retrySeconds > 0) {
-      const timer = setInterval(() => { retrySeconds -= 1; }, 1000);
-      return () => clearInterval(timer);
-    }
-  });
+		studentApi
+			.getCandidates(id)
+			.then((res) => {
+				const data = res.data || [];
+				/** @type {Record<string, any[]>} */
+				const grouped = {};
+				data.forEach((/** @type {any} */ c) => {
+					if (!grouped[c.position]) grouped[c.position] = [];
+					grouped[c.position].push({
+						id: c.id,
+						name: c.students?.full_name || 'Unknown',
+						party: c.partylists?.name || 'Independent'
+					});
+				});
+				candidatesGrouped = grouped;
+				/** @type {Record<string, string | null>} */
+				const initialVotes = {};
+				Object.keys(grouped).forEach((pos) => {
+					initialVotes[pos] = null;
+				});
+				selectedVotes = initialVotes;
+			})
+			.catch((/** @type {any} */ err) => {
+				errorMessage = err.message || 'Failed to load ballot data.';
+			})
+			.finally(() => {
+				isLoading = false;
+			});
+	});
 
-  async function verifyAdviserCode() {
-    if (!adviserPasscode) return;
-    isVerifyingPasscode = true;
-    errorMessage = '';
-    try {
-      await studentApi.verifyPasscode(electionId, adviserPasscode);
-      isAuthorized = true;
-      showToast('Welcome to the Voting Booth');
-    } catch (/** @type {any} */ err) {
-      errorMessage = err.message || 'Invalid Adviser Passcode.';
-    } finally {
-      isVerifyingPasscode = false;
-    }
-  }
+	async function verifyAdviserCode() {
+		if (!adviserPasscode) return;
+		isVerifyingPasscode = true;
+		errorMessage = '';
+		try {
+			await studentApi.verifyPasscode(electionId, adviserPasscode);
+			isAuthorized = true;
+		} catch (/** @type {any} */ err) {
+			errorMessage = err.message || 'Invalid Adviser Passcode.';
+		} finally {
+			isVerifyingPasscode = false;
+		}
+	}
 
-  async function fetchPin() {
-    if (votingPin) {
-      showPin = true;
-      return;
-    }
-    const session = $voterSession;
-    if (!session?.student_id) return;
-    try {
-      const res = await studentApi.getVotingPin(session.student_id);
-      votingPin = res.voting_pin;
-      showPin = true;
-    } catch (/** @type {any} */ err) { showToast('Failed to retrieve PIN'); }
-  }
+	async function fetchPin() {
+		if (votingPin) {
+			showPin = true;
+			return;
+		}
+		const session = $voterSession;
+		if (!session?.student_id) return;
+		try {
+			const res = await studentApi.getVotingPin(session.student_id);
+			votingPin = res.voting_pin;
+			showPin = true;
+		} catch (/** @type {any} */ err) {
+			console.error('PIN fetch failed');
+		}
+	}
 
-  async function submitVote() {
-    const session = $voterSession;
-    if (!session) { goto('/student/validate'); return; }
-    if (pinConfirmInput !== votingPin) {
-      errorMessage = 'Incorrect Voting PIN. Please verify and try again.';
-      return;
-    }
+	async function submitVote() {
+		const session = $voterSession;
+		if (!session) return;
+		if (pinConfirmInput !== votingPin) {
+			errorMessage = 'Incorrect Voting PIN.';
+			return;
+		}
 
-    isSubmitting = true;
-    errorMessage = '';
-    const votes = Object.entries(selectedVotes)
-      .filter(([_, id]) => id)
-      .map(([position, candidate_id]) => ({ candidate_id: /** @type {string} */ (candidate_id), position }));
-    try {
-      const resp = await studentApi.vote(session.student_id ?? '', electionId, votes, votingPin);
-      if (resp && resp.receipt_id) receiptId = resp.receipt_id;
-      voterSession.markVoted(electionId);
-      showConfirm = false;
-      hasSubmitted = true;
-      showToast('Your vote has been submitted successfully!');
-      setTimeout(() => goto(`/student`), 5000);
-    } catch (/** @type {any} */ err) {
-      if (err.retryAfter) {
-        retrySeconds = err.retryAfter;
-        errorMessage = `Too many attempts. Locked for ${retrySeconds}s.`;
-      } else {
-        errorMessage = err.message ?? 'Failed to submit ballot.';
-      }
-    } finally {
-      isSubmitting = false;
-    }
-  }
+		isSubmitting = true;
+		errorMessage = '';
+		const votes = Object.entries(selectedVotes)
+			.filter(([_, id]) => id !== null)
+			.map(([position, candidate_id]) => ({ 
+				candidate_id: /** @type {string} */ (candidate_id), 
+				position 
+			}));
+
+		try {
+			const resp = await studentApi.vote(session.student_id ?? '', electionId, votes, votingPin);
+			if (resp && resp.receipt_id) receiptId = resp.receipt_id;
+			voterSession.markVoted(electionId);
+			showConfirm = false;
+			hasSubmitted = true;
+		} catch (/** @type {any} */ err) {
+			errorMessage = err.message || 'Failed to cast ballot.';
+		} finally {
+			isSubmitting = false;
+		}
+	}
 </script>
 
-<svelte:head><title>Official Ballot | UniVote</title></svelte:head>
+<svelte:head><title>Voting Room | UniVote</title></svelte:head>
 
-<div class="min-h-full">
-  <!-- Gatekeeper Overlay -->
-  {#if electionId && !isAuthorized && !alreadyVoted && !isLoading && !hasSubmitted}
-    <div class="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-surface-main/90 backdrop-blur-xl" in:fade>
-      <div class="w-full max-w-md bg-surface-card border border-line-subtle rounded-[2rem] p-8 shadow-2xl text-center" in:scale={{ duration: 400, start: 0.9, easing: elasticOut }}>
-        <div class="w-16 h-16 bg-[var(--status-warning-bg)] text-[var(--status-warning-fg)] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
-          <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25-2.25v6.75a2.25 2.25 0 002.25 2.25z"/></svg>
-        </div>
-        <h2 class="text-xl font-black text-content-main mb-2">Gatekeeper Required</h2>
-        <p class="text-content-subtle text-sm mb-8 font-medium">Enter the 16-digit Adviser Passcode to unlock this protected voting session.</p>
-        
-        <div class="space-y-6">
-          <input 
-            type="text" bind:value={adviserPasscode} placeholder="XXXX-XXXX-XXXX-XXXX"
-            class="input-base w-full text-center font-mono py-4 text-[1rem] uppercase tracking-[0.2em]"
-          />
-          {#if errorMessage}
-            <div class="pill pill-danger" style="width:100%;justify-content:center;">{errorMessage}</div>
-          {/if}
-          <button onclick={verifyAdviserCode} disabled={isVerifyingPasscode || !adviserPasscode} class="btn-primary w-full py-4 text-[11px] font-black uppercase tracking-[0.2em]">
-            {#if isVerifyingPasscode} <LoadingSpinner /> Authorizing... {:else} Open Ballot Portal {/if}
-          </button>
-          <a href="/student" class="inline-block text-[10px] font-black uppercase text-content-subtle hover:text-content-main hover:underline underline-offset-4 tracking-[0.2em]">Return to Safety</a>
-        </div>
-      </div>
-    </div>
-  {/if}
-
-  {#if alreadyVoted}
-    <!-- Already Voted -->
-    <div class="min-h-[80vh] flex items-center justify-center p-6" in:fade={{ duration: 400 }}>
-      <div class="text-center max-w-sm">
-        <div class="w-16 h-16 bg-surface-elevated border border-line-subtle rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm">
-          <svg class="w-8 h-8 text-content-subtle" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        </div>
-        <h2 class="text-xl font-black text-content-main mb-2">Access Restricted</h2>
-        <p class="text-content-subtle text-sm mb-8 font-medium">Our records show your ballot has already been securely cast and certified.</p>
-        <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <a href="/student" class="btn-primary w-full sm:w-auto">Portal Home</a>
-          <a href="/student/results" class="btn-secondary w-full sm:w-auto">Audit Results</a>
-        </div>
-      </div>
-    </div>
-
-  {:else if hasSubmitted}
-    <!-- Receipt -->
-    <div class="min-h-screen flex items-center justify-center p-6" in:fade={{ duration: 600 }}>
-      <div class="w-full max-w-sm mx-auto">
-        <div class="bg-surface-card border border-line-main shadow-2xl p-8 relative flex flex-col items-center" style="border-radius:2rem;border-bottom:4px dashed var(--border-strong);" in:fly={{ y: 60, duration: 1000, delay: 200, easing: elasticOut }}>
-          <div class="absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-surface-main border border-line-main"></div>
-          <div class="text-center mb-8 pt-4 w-full border-b border-dashed border-line-main pb-8">
-            <div class="w-16 h-16 bg-[var(--status-success-bg)] text-[var(--status-success-fg)] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
-              <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            </div>
-            <p class="text-[10px] font-black tracking-[0.3em] text-content-subtle uppercase mb-2">Vote Certified</p>
-            <h2 class="text-xl font-black text-content-main tracking-tight">Receipt Generated</h2>
-          </div>
-          
-          <div class="w-full space-y-4 mb-10 text-xs font-mono font-black text-content-subtle tracking-tight">
-             <div class="flex justify-between items-center opacity-80"><span>IDENTIFIER</span><span class="text-content-main">{(voterName).substring(0,3).toUpperCase()}***</span></div>
-             <div class="flex justify-between items-center opacity-80"><span>SESSION</span><span class="text-content-main max-w-[150px] truncate text-right">{electionName}</span></div>
-             <div class="flex justify-between items-center opacity-80"><span>CERTIFIED</span><span class="text-content-main font-bold">{new Date().toLocaleDateString()}</span></div>
-             <div class="pt-6 mt-6 border-t border-dashed border-line-main flex flex-col items-center gap-3">
-               <span class="text-[10px] uppercase tracking-widest text-content-muted">BLOCKCHAIN RECEIPT NO.</span>
-               <span class="text-[0.9rem] font-black text-[var(--status-success-fg)] tracking-[0.1em] break-all text-center">{receiptId || 'PENDING...'}</span>
-             </div>
-          </div>
-          <div class="text-center text-[10px] text-content-subtle font-bold uppercase tracking-widest leading-relaxed">This receipt is your cryptographic proof of participation.</div>
-        </div>
-        <div class="mt-8 text-center px-4" in:fade={{ delay: 800 }}>
-          <a href="/student" class="btn-primary w-full shadow-2xl">Return to Portal</a>
-        </div>
-      </div>
-    </div>
-
-  {:else if isLoading}
-    <!-- Loading -->
-    <div class="min-h-screen flex flex-col items-center justify-center gap-6">
-      <LoadingSpinner />
-      <p class="text-content-subtle font-black text-[10px] uppercase tracking-[0.3em] animate-pulse">Initializing Secure Protocol...</p>
-    </div>
-
-  {:else}
-    <!-- Main Ballot -->
-    <GlassCard title={electionId ? "Official Ballot" : "Voting Room"} subtitle={electionId ? electionName : "Secure Election Portal"}>
-      {#snippet headerExtra()}
-        {#if electionId}
-          <div class="mt-4 lg:mt-0 flex flex-col items-end gap-2" in:fly={{ x: 20, duration: 800, delay: 200 }}>
-            <div class="flex items-center gap-3 bg-surface-elevated border border-line-subtle rounded-2xl px-5 py-3 shadow-inner">
-               <div class="text-right">
-                 <p class="text-lg font-black text-content-main tracking-widest leading-none">{selectedCount}/{totalPositions}</p>
-                 <p class="text-[9px] font-black text-content-subtle uppercase tracking-widest mt-1">Assignments</p>
-               </div>
-               <div class="w-8 h-8 rounded-full border-2 border-[var(--status-success-bg)] flex items-center justify-center relative bg-[var(--status-success-bg)] text-[var(--status-success-fg)]">
-                  {#if allSelected}
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                  {/if}
-               </div>
-            </div>
-          </div>
-        {/if}
-      {/snippet}
-
-      {#if !electionId}
-        <!-- Election List View -->
-        {@const elections = ($voterSession?.elections || []).filter(e => !e.has_voted)}
-        {#if elections.length === 0}
-          <div class="empty-state">You have completed all active election sessions. Thank you for participating in the democratic process.</div>
-        {:else}
-          <div class="bento-grid bento-2col" style="margin-top:1.5rem;">
-            {#each elections as election}
-              <div class="admin-card group" style="padding:2rem;text-align:center;display:flex;flex-direction:column;align-items:center;">
-                <div class="w-16 h-16 bg-surface-main border border-line-main rounded-2xl flex items-center justify-center mb-6 shadow-sm transition-transform group-hover:scale-110">
-                   <svg class="w-8 h-8 text-brand-primary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                </div>
-                <h3 class="text-lg font-black text-content-main mb-2 uppercase tracking-tight group-hover:text-brand-primary transition-colors">{election.name}</h3>
-                <p class="text-[10px] font-black text-content-subtle uppercase tracking-widest mb-8">Verification Required</p>
-                <a href="/student/ballot?election={election.id}" class="btn-primary w-full">Enter Booth</a>
-              </div>
-            {/each}
-          </div>
-        {/if}
-
-      {:else}
-        <!-- Ballot Form -->
-        <div style="margin-top:1.5rem;display:flex;flex-direction:column;gap:3rem;">
-          <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-line-main" in:fly={{ y: 20, duration: 800, delay: 300 }}>
-             <div>
-                <h2 class="text-xl font-black text-content-main tracking-tight leading-tight mb-2">Authenticated Session: Welcome {voterName.split(' ')[0]}</h2>
-                <p class="text-sm font-medium text-content-muted leading-relaxed">Assign your choices carefully. Selections are encrypted and cannot be altered.</p>
-             </div>
-             <a href="/student/ballot" class="btn-secondary whitespace-nowrap">Abort Session</a>
-          </div>
-
-          {#if errorMessage}
-            <div class="pill pill-danger" style="width:100%;justify-content:flex-start;">{errorMessage}</div>
-          {/if}
-
-          {#if totalPositions === 0}
-            <div class="empty-state">This election session has no candidates assigned.</div>
-          {:else}
-            <div style="display:flex;flex-direction:column;gap:4rem;">
-              {#each positionOrder as position, idx}
-                {@const list = candidatesGrouped[position] || []}
-                {@const isComplete = !!selectedVotes[position]}
-
-                <div in:fly={{ y: 20, duration: 800, delay: 400 + idx * 100 }}>
-                  <div class="flex items-center gap-4 mb-6">
-                    <div class="w-10 h-10 {isComplete ? 'bg-[var(--status-success-bg)] text-[var(--status-success-fg)]' : 'bg-surface-elevated text-content-main'} rounded-xl flex items-center justify-center text-sm font-black transition-all shadow-sm">
-                      {#if isComplete}
-                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                      {:else} {idx + 1} {/if}
-                    </div>
-                    <div>
-                      <h2 class="text-base font-black text-content-main uppercase tracking-tight">{position}</h2>
-                      <p class="text-[10px] font-black text-content-subtle uppercase tracking-widest mt-0.5">
-                        {isComplete ? 'Selection Recorded' : 'Select candidate'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div class="bento-grid bento-3col text-center">
-                    {#each list as candidate}
-                      {@const isSelected = selectedVotes[position] === candidate.id}
-                      <label class="cursor-pointer select-none group relative h-full">
-                        <input type="radio" name={position} value={candidate.id} bind:group={selectedVotes[position]} class="sr-only" />
-                        <div class="h-full bg-surface-card border rounded-[1.5rem] p-6 flex flex-col items-center transition-all duration-300 active:scale-95 shadow-sm
-                             {isSelected ? 'border-[var(--status-success-fg)] shadow-[var(--status-success-bg)]' : 'border-line-main group-hover:border-line-strong'}"
-                        >
-                          <div class="avatar-initial w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-black mb-4 transition-all
-                               {isSelected ? 'bg-[var(--status-success-bg)] text-[var(--status-success-fg)] scale-110' : 'bg-surface-elevated text-content-muted'}">
-                            {getMonogram(candidate.name)}
-                          </div>
-                          
-                          <div class="flex-1">
-                            <h4 class="text-sm font-black text-content-main mb-1">{candidate.name}</h4>
-                            <p class="text-[9px] font-black text-content-subtle uppercase tracking-[0.2em]">{candidate.party}</p>
-                          </div>
-
-                          <div class="mt-4 flex items-center gap-2">
-                             <div class="w-2 h-2 rounded-full transition-all {isSelected ? 'bg-[var(--status-success-fg)]' : 'bg-line-main'}"></div>
-                             <span class="text-[9px] font-black uppercase tracking-[0.2em] {isSelected ? 'text-[var(--status-success-fg)]' : 'text-content-subtle'}">
-                               {isSelected ? 'SELECTED' : 'CHOOSE'}
-                             </span>
-                          </div>
-                        </div>
-                      </label>
-                    {/each}
-                  </div>
-                </div>
-              {/each}
-            </div>
-
-            <div class="mt-12 bg-surface-elevated p-8 rounded-[2rem] flex flex-col items-center text-center shadow-inner border border-line-subtle" in:fly={{ y: 20, duration: 1000, delay: 600 }}>
-              <h3 class="text-xl font-black text-content-main tracking-tight mb-2">
-                {allSelected ? 'Protocol Complete' : 'Protocol Pending'}
-              </h3>
-              <p class="text-content-muted text-sm font-medium mb-8">
-                {allSelected ? 'All ballot assignments have been recorded. Proceed to final encryption.' : `You must designate candidates for all ${totalPositions} positions.`}
-              </p>
-              <button onclick={() => showConfirm = true} disabled={!allSelected} class="btn-primary" style="padding:1rem 2rem;font-size:0.875rem;">
-                Certify Ballot
-              </button>
-            </div>
-          {/if}
-        </div>
-      {/if}
-    </GlassCard>
-  {/if}
+<div class="page-header">
+	<div class="breadcrumb-row">
+		<div class="live-dot"></div>
+		<span class="breadcrumb">OFFICIAL VOTING PORTAL</span>
+	</div>
+	<h1 class="page-title">Voting Room</h1>
 </div>
 
-<!-- Confirm Modal -->
+{#if isLoading}
+	<div class="loader-area" in:fade>
+		<div class="spinner"></div>
+		<p>Initializing secure protocol…</p>
+	</div>
+{:else if hasSubmitted || alreadyVoted}
+	<div class="completed-wrapper" in:fade>
+		<div class="completed-card">
+			<div class="check-ring">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+			</div>
+			<div class="completed-title">All Done, {voterName.split(' ')[0]}!</div>
+			<div class="completed-body">
+				<p>You've completed all active election sessions.</p>
+				<p class="bold">Thank you for participating in the democratic process.</p>
+				<p class="muted">Your vote has been securely recorded.</p>
+			</div>
+			<div class="action-row">
+				<a href="/student/results?election={electionId}" class="btn btn-green" aria-label="View Election Results">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+					View Results
+				</a>
+				<a href="/student" class="btn btn-white" aria-label="Return to Dashboard">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+					Back to Dashboard
+				</a>
+			</div>
+			<div class="receipt-note">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+				A voting receipt has been saved to your dashboard
+			</div>
+		</div>
+	</div>
+{:else if electionId && !isAuthorized}
+	<!-- Gatekeeper -->
+	<div class="gatekeeper-area" in:fade>
+		<div class="gatekeeper-card">
+			<div class="lock-icon">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+			</div>
+			<h2 class="gk-title">Gatekeeper Required</h2>
+			<p class="gk-body">Enter the 16-digit Adviser Passcode to unlock this protected voting session.</p>
+			
+			<div class="gk-form">
+				<input 
+					type="text" 
+					bind:value={adviserPasscode} 
+					placeholder="XXXX-XXXX-XXXX-XXXX"
+					class="passcode-input"
+				>
+				{#if errorMessage}
+					<p class="err-msg">{errorMessage}</p>
+				{/if}
+				<button class="btn btn-primary w-full" disabled={isVerifyingPasscode} onclick={verifyAdviserCode}>
+					{#if isVerifyingPasscode}
+						Authorizing…
+					{:else}
+						Open Ballot Portal
+					{/if}
+				</button>
+				<a href="/student" class="gk-abort">Return to Dashboard</a>
+			</div>
+		</div>
+	</div>
+{:else if electionId}
+	<!-- Ballot -->
+	<div class="ballot-container" in:fade>
+		<div class="ballot-header">
+			<div class="ballot-h-left">
+				<h2 class="ballot-name">{electionName}</h2>
+				<p class="ballot-subtitle">Authenticated Session: Welcome {voterName.split(' ')[0]}</p>
+			</div>
+			<div class="progress-pill">
+				<span class="count">{selectedCount} / {totalPositions}</span>
+				<span class="label">Positions</span>
+			</div>
+		</div>
+
+		{#if errorMessage}
+			<div class="err-banner" in:fly={{ y: -10 }}>{errorMessage}</div>
+		{/if}
+
+		<div class="positions-stack">
+			{#each positionOrder as position, idx}
+				<div class="position-section" in:fly={{ y: 20, delay: idx * 100 }}>
+					<div class="pos-header">
+						<div class="pos-num" class:done={selectedVotes[position]}>{idx + 1}</div>
+						<div class="pos-text">
+							<h3 class="pos-title">{position}</h3>
+							<p class="pos-meta">{selectedVotes[position] ? 'Selection Recorded' : 'Select Candidate'}</p>
+						</div>
+					</div>
+
+					<div class="candidates-grid">
+						{#each candidatesGrouped[position] as cand}
+							<button 
+								class="cand-card" 
+								class:active={selectedVotes[position] === cand.id}
+								onclick={() => selectedVotes[position] = cand.id}
+							>
+								<div class="cand-avatar">{getMonogram(cand.name)}</div>
+								<div class="cand-name">{cand.name}</div>
+								<div class="cand-party">{cand.party}</div>
+								<div class="cand-check">
+									<div class="check-dot"></div>
+									<span>{selectedVotes[position] === cand.id ? 'SELECTED' : 'CHOOSE'}</span>
+								</div>
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/each}
+		</div>
+
+		<div class="footer-action">
+			<div class="footer-info">
+				<h3 class="f-title">{allSelected ? 'Protocol Complete' : 'Protocol Pending'}</h3>
+				<p class="f-body">{allSelected ? 'Ballot ready for final encryption.' : `Designate candidates for all ${totalPositions} positions.`}</p>
+			</div>
+			<button class="btn btn-primary lg" disabled={!allSelected} onclick={() => showConfirm = true}>
+				Certify Ballot
+			</button>
+		</div>
+	</div>
+{:else}
+	<!-- Election Selection (Rare if coming from home, but fallback) -->
+	{#if Array.isArray($voterSession?.elections)}
+		{@const pElections = ($voterSession?.elections || []).filter(e => !e.has_voted)}
+		{#if pElections.length > 0}
+			<div class="selection-grid" in:fade>
+				{#each pElections as e}
+					<a href="/student/ballot?election={e.id}" class="e-select-card">
+						<div class="e-icon">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+						</div>
+						<div class="e-info">
+							<span class="e-name">{e.name}</span>
+							<span class="e-meta">Session active until {new Date(e.end_date || Date.now()).toLocaleDateString()}</span>
+						</div>
+						<span class="e-btn">Start Voting</span>
+					</a>
+				{/each}
+			</div>
+		{:else}
+			<div class="empty-ballot-hero" in:scale={{ start: 0.95, duration: 400 }}>
+				<div class="hero-icon-ring">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+				</div>
+				<h2 class="hero-title">All Secured</h2>
+				<p class="hero-body">You have no pending election sessions at this time. All your ballots are encrypted and stored.</p>
+				<a href="/student" class="btn btn-primary lg">Return to Dashboard</a>
+			</div>
+		{/if}
+	{/if}
+{/if}
+
+<!-- Confirmation Modal -->
 {#if showConfirm}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div 
-    class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-surface-main/80 backdrop-blur-md"
-    in:fade={{ duration: 200 }}
-    onclick={(e) => { if (e.target === e.currentTarget) showConfirm = false; }} onkeydown={() => {}}
-  >
-    <div class="bg-surface-card border border-line-main rounded-[2rem] w-full max-w-md p-8 shadow-2xl" in:fly={{ y: 20, duration: 250 }}>
-      <h3 class="text-xl font-black text-content-main mb-2">Confirm Ballot</h3>
-      <p class="text-xs text-content-muted mb-6 font-medium">Your vote is anonymous and final. Are you sure you want to proceed?</p>
-      
-      <div class="bg-surface-elevated border border-line-subtle rounded-2xl p-4 mb-6 space-y-3 max-h-48 overflow-y-auto">
-        {#each getReviewList() as item}
-          <div class="flex items-center justify-between border-b border-line-main last:border-0 pb-2 last:pb-0">
-            <span class="text-[10px] font-black text-content-subtle uppercase tracking-widest">{item.position}</span>
-            <span class="text-xs font-black text-content-main">{item.candidate?.name}</span>
-          </div>
-        {/each}
-      </div>
+	<div 
+		class="modal-overlay" 
+		in:fade 
+		role="button"
+		tabindex="-1"
+		onclick={() => showConfirm = false}
+		onkeydown={e => e.key === 'Escape' && (showConfirm = false)}
+	>
+		<div class="modal-card" role="dialog" aria-modal="true" tabindex="-1" onclick={e => e.stopPropagation()} onkeydown={e => e.stopPropagation()} in:scale={{ start: 0.9 }}>
+			<h3 class="modal-title">Confirm Ballot</h3>
+			<p class="modal-subtitle">Your vote is anonymous and final. Secure encryption is about to engage.</p>
+			
+			<div class="review-box">
+				{#each getReviewList() as item}
+					<div class="review-item">
+						<span class="r-pos">{item.position}</span>
+						<span class="r-name">{item.candidate.name}</span>
+					</div>
+				{/each}
+			</div>
 
-      <div class="mb-8">
-        <div class="flex items-center justify-between mb-3">
-          <label for="pin-input" class="text-[10px] font-bold text-content-muted uppercase tracking-widest">Enter Voting PIN</label>
-          {#if !showPin}
-            <button onclick={fetchPin} class="text-[10px] font-black text-brand-primary hover:underline">Show My PIN</button>
-          {/if}
-        </div>
+			<div class="pin-section">
+				<div class="pin-header">
+					<span class="p-label">Enter Voting PIN</span>
+					{#if !showPin}
+						<button class="p-get" onclick={fetchPin}>Show My PIN</button>
+					{/if}
+				</div>
+				{#if showPin}
+					<div class="pin-reveal" in:fade>
+						<span class="pr-label">Unique PIN</span>
+						<span class="pr-val">{votingPin}</span>
+					</div>
+				{/if}
+				<input type="text" maxlength="6" bind:value={pinConfirmInput} placeholder="XXXXXX" class="pin-input">
+			</div>
 
-        {#if showPin}
-          <div class="mb-4 pill pill-success" style="justify-content:space-between;border-radius:1rem;">
-            <div>
-              <p class="text-[9px] font-black uppercase tracking-widest mb-0.5 opacity-80">Unique PIN</p>
-              <p class="text-lg font-mono font-black tracking-[0.2em]">{votingPin}</p>
-            </div>
-            <button onclick={() => showPin = false} class="opacity-60 hover:opacity-100" aria-label="Close PIN">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-          </div>
-        {/if}
-
-        <input 
-          id="pin-input" type="text" bind:value={pinConfirmInput} maxlength="6" placeholder="XXXXXX"
-          class="input-base w-full text-center text-lg font-mono font-black tracking-[0.3em] uppercase py-4"
-        />
-        
-        {#if errorMessage}
-           <div class="pill pill-danger mt-4" style="font-size:0.6875rem;">{errorMessage}</div>
-        {/if}
-      </div>
-
-      <div class="flex gap-4">
-        <button onclick={() => { showConfirm = false; pinConfirmInput = ''; errorMessage = ''; }} class="btn-secondary flex-1">Go Back</button>
-        <button onclick={submitVote} disabled={isSubmitting || pinConfirmInput.length < 6 || retrySeconds > 0} class="btn-primary flex-1">
-          {#if isSubmitting} <LoadingSpinner /> Casting... {:else} Cast Vote {/if}
-        </button>
-      </div>
-    </div>
-  </div>
+			<div class="modal-buttons">
+				<button class="btn btn-ghost flex-1" onclick={() => showConfirm = false}>Cancel</button>
+				<button class="btn btn-primary flex-1" disabled={isSubmitting || pinConfirmInput.length < 6} onclick={submitVote}>
+					{isSubmitting ? 'Casting…' : 'Cast Vote'}
+				</button>
+			</div>
+		</div>
+	</div>
 {/if}
 
-{#if toastVisible}
-  <div class="fixed bottom-6 left-1/2 -translate-x-1/2 pill pill-success z-[200] shadow-xl" in:fly={{ y: 16, duration: 300 }} out:fade={{ duration: 200 }}>
-    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-    <span>{toastMessage}</span>
-  </div>
-{/if}
+<style>
+	.page-header { margin-bottom: 24px; }
+	.breadcrumb-row { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+	.live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s ease infinite; }
+	@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.5); } }
+	.breadcrumb { font-size: 11px; text-transform: uppercase; letter-spacing: 1.4px; color: var(--accent); font-weight: 700; }
+	.page-title { font-size: 26px; font-weight: 800; letter-spacing: -0.8px; color: var(--text); }
+
+	.loader-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; color: var(--muted); padding: 40px 0; }
+	.spinner { width: 40px; height: 40px; border: 3px solid var(--surface2); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+	@keyframes spin { to { transform: rotate(360deg); } }
+
+	/* COMPLETED CARD */
+	.completed-wrapper { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px 0; }
+	.completed-card {
+		background: var(--surface); border: 1px solid var(--border); border-radius: 28px;
+		padding: 64px 40px; text-align: center; width: 100%; max-width: 740px;
+		box-shadow: 0 4px 30px rgba(0,0,0,.03); position: relative;
+	}
+	.check-ring {
+		width: 84px; height: 84px; border-radius: 50%;
+		background: #ecfdf5; border: 1px solid rgba(16,185,129,.2);
+		display: grid; place-items: center; margin: 0 auto 32px;
+	}
+	.check-ring svg { width: 32px; height: 32px; color: #10b981; }
+	.completed-title { font-size: 30px; font-weight: 800; letter-spacing: -1.2px; color: var(--text); margin-bottom: 20px; }
+	.completed-body { font-size: 15px; color: var(--muted); line-height: 1.8; margin-bottom: 36px; }
+	.completed-body .bold { font-weight: 800; color: var(--text2); }
+	.completed-body .muted { font-size: 14px; opacity: 0.8; }
+	
+	.action-row { display: flex; gap: 16px; justify-content: center; margin-bottom: 32px; }
+	
+	.btn-green { background: #10b981; color: white; box-shadow: 0 4px 14px rgba(16,185,129,0.25); }
+	.btn-green:hover { filter: brightness(1.1); transform: translateY(-1.5px); }
+	.btn-white { background: white; border: 1.5px solid var(--border); color: var(--text2); }
+	.btn-white:hover { background: var(--surface2); transform: translateY(-1.5px); }
+
+	.receipt-note { font-size: 12px; color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; opacity: 0.7; }
+	.receipt-note svg { width: 14px; height: 14px; color: var(--accent); }
+
+	/* GATEKEEPER */
+	.gatekeeper-area { display: flex; justify-content: center; padding: 40px 0; }
+	.gatekeeper-card { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 32px; width: 100%; max-width: 420px; text-align: center; box-shadow: var(--shadow-card); }
+	.lock-icon { width: 64px; height: 64px; border-radius: 18px; background: var(--amber-bg); color: var(--amber); display: grid; place-items: center; margin: 0 auto 20px; }
+	.lock-icon svg { width: 28px; height: 28px; }
+	.gk-title { font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 8px; }
+	.gk-body { font-size: 13px; color: var(--muted); margin-bottom: 24px; line-height: 1.6; font-weight: 500; }
+	.passcode-input { width: 100%; padding: 16px; border-radius: 12px; border: 1.5px solid var(--border); font-family: monospace; text-align: center; letter-spacing: 2px; font-size: 16px; margin-bottom: 20px; outline: none; transition: border-color 0.2s; }
+	.passcode-input:focus { border-color: var(--accent); }
+	.gk-abort { display: block; margin-top: 16px; font-size: 12px; font-weight: 700; color: var(--muted); text-decoration: none; text-transform: uppercase; letter-spacing: 1px; }
+	.gk-abort:hover { color: var(--text); }
+	.err-msg { color: var(--red); font-size: 12px; font-weight: 700; margin-bottom: 16px; }
+
+	/* BALLOT */
+	.ballot-container { width: 100%; max-width: 1800px; padding-bottom: 60px; }
+	.ballot-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 32px; flex-wrap: wrap; }
+	.ballot-name { font-size: 42px; font-weight: 800; color: var(--text); letter-spacing: -1.5px; }
+	.ballot-subtitle { font-size: 13px; color: var(--muted); font-weight: 500; margin-top: 2px; }
+	.progress-pill { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; padding: 10px 16px; display: flex; flex-direction: column; align-items: flex-end; }
+	.progress-pill .count { font-size: 16px; font-weight: 800; color: var(--text); line-height: 1; }
+	.progress-pill .label { font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+
+	.err-banner { background: #fef2f2; border: 1px solid rgba(239, 68, 68, 0.2); color: var(--red); padding: 12px 16px; border-radius: 12px; font-size: 13px; font-weight: 700; margin-bottom: 24px; }
+
+	.positions-stack { display: flex; flex-direction: column; gap: 48px; margin-bottom: 60px; }
+	.pos-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+	.pos-num { width: 40px; height: 40px; border-radius: 12px; background: var(--surface2); border: 1px solid var(--border); display: grid; place-items: center; font-size: 15px; font-weight: 800; color: var(--muted); transition: all 0.2s; }
+	.pos-num.done { background: var(--green-bg); border-color: rgba(18,183,106,0.3); color: var(--green); }
+	.pos-title { font-size: 16px; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: 0.5px; }
+	.pos-meta { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 1px; }
+
+	.candidates-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+	.cand-card { background: var(--surface); border: 2px solid var(--border); border-radius: 24px; padding: 32px; text-align: center; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); background: var(--surface); position: relative; overflow: hidden; }
+	.cand-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+	.cand-card.active { border-color: var(--green); background: var(--green-bg); border-width: 2px; }
+	.cand-avatar { width: 60px; height: 60px; border-radius: 50%; background: var(--surface2); color: var(--muted); font-size: 18px; font-weight: 800; display: grid; place-items: center; margin: 0 auto 16px; transition: all 0.2s; }
+	.cand-card.active .cand-avatar { background: var(--accent); color: white; }
+	.cand-name { font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+	.cand-party { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 24px; }
+	.cand-check { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+	.check-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+	.cand-card.active .check-dot { background: var(--green); }
+	.cand-card.active .cand-check span { color: var(--green); }
+
+	.footer-action { background: var(--surface2); border: 1px solid var(--border); border-radius: 24px; padding: 32px; text-align: center; }
+	.footer-info { margin-bottom: 24px; }
+	.f-title { font-size: 18px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+	.f-body { font-size: 13px; color: var(--muted); font-weight: 500; }
+
+	/* MODAL */
+	.modal-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(19, 25, 38, 0.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: grid; place-items: center; padding: 20px; }
+	.modal-card { background: var(--surface); border: 1px solid var(--border); border-radius: 28px; width: 100%; max-width: 440px; padding: 32px; box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
+	.modal-title { font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 8px; }
+	.modal-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 24px; font-weight: 500; line-height: 1.5; }
+	.review-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 16px; padding: 8px; margin-bottom: 24px; max-height: 200px; overflow-y: auto; }
+	.review-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+	.review-item:last-child { border: none; }
+	.r-pos { font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+	.r-name { font-size: 13px; font-weight: 800; color: var(--text); }
+	.pin-section { margin-bottom: 28px; }
+	.pin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+	.p-label { font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+	.p-get { font-size: 10px; font-weight: 800; color: var(--accent); border: none; background: transparent; cursor: pointer; }
+	.pin-reveal { background: var(--green-bg); border: 1px solid rgba(18,183,106,0.3); border-radius: 12px; padding: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+	.pr-label { font-size: 9px; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: 1px; }
+	.pr-val { font-family: monospace; font-size: 18px; font-weight: 800; color: var(--green); letter-spacing: 4px; }
+	.pin-input { width: 100%; padding: 16px; border-radius: 12px; border: 1.5px solid var(--border); text-align: center; font-size: 18px; font-weight: 800; font-family: monospace; letter-spacing: 4px; outline: none; transition: border-color 0.2s; }
+	.pin-input:focus { border-color: var(--accent); }
+	.modal-buttons { display: flex; gap: 12px; }
+
+	/* SELECTION */
+	.selection-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(540px, 1fr)); gap: 32px; padding: 20px 0; }
+	.e-select-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 32px; padding: 40px; text-decoration: none; display: flex; align-items: center; gap: 32px; transition: all 0.28s; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+	.e-select-card:hover { transform: translateY(-6px); border-color: var(--accent); box-shadow: 0 20px 40px rgba(92, 96, 245, 0.12); }
+	.e-icon { width: 72px; height: 72px; border-radius: 24px; background: var(--accent-bg); color: var(--accent); display: grid; place-items: center; flex-shrink: 0; }
+	.e-icon svg { width: 32px; height: 32px; }
+	.e-info { flex: 1; min-width: 0; }
+	.e-name { display: block; font-size: 26px; font-weight: 800; color: var(--text); margin-bottom: 14px; line-height: 1.25; letter-spacing: -0.8px; }
+	.e-meta { display: block; font-size: 13px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
+	.e-btn { background: var(--surface2); color: var(--text2); font-size: 12px; font-weight: 800; padding: 12px 20px; border-radius: 14px; text-transform: uppercase; letter-spacing: 1.5px; white-space: nowrap; transition: all 0.2s; }
+	.e-select-card:hover .e-btn { background: var(--accent); color: white; transform: scale(1.05); }
+
+	/* EMPTY HERO */
+	.empty-ballot-hero { background: var(--surface); border: 1.5px solid var(--border); border-radius: 32px; padding: 80px 40px; text-align: center; max-width: 600px; margin-top: 40px; }
+	.hero-icon-ring { width: 80px; height: 80px; border-radius: 50%; background: var(--accent-bg); color: var(--accent); border: 1px solid rgba(92, 96, 245, 0.2); display: grid; place-items: center; margin: 0 auto 32px; }
+	.hero-icon-ring svg { width: 32px; height: 32px; }
+	.hero-title { font-size: 28px; font-weight: 800; color: var(--text); margin-bottom: 16px; letter-spacing: -1px; }
+	.hero-body { font-size: 15px; color: var(--muted); line-height: 1.7; margin-bottom: 40px; }
+
+	/* GENERAL BUTTONS */
+	.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; border-radius: 14px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all .18s; border: none; font-family: inherit; text-decoration: none; }
+	.btn-primary { background: var(--green); color: #fff; box-shadow: 0 4px 12px rgba(18,183,106,.2); }
+	.btn-primary:not(:disabled):hover { filter: brightness(1.1); transform: translateY(-1.5px); }
+	.btn-ghost { background: transparent; border: 1.5px solid var(--border); color: var(--text2); }
+	.btn-ghost:hover { background: var(--surface2); }
+	.btn.lg { padding: 16px 32px; font-size: 15px; }
+	.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+	@media (max-width: 768px) {
+		.page-title { font-size: 24px; }
+		.completed-card { padding: 40px 20px; }
+		.completed-title { font-size: 24px; }
+		.action-row { flex-direction: column; gap: 12px; }
+		.action-row .btn { width: 100%; }
+		.completed-wrapper { padding: 20px 0; }
+	}
+</style>

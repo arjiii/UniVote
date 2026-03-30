@@ -1,0 +1,14 @@
+# Root .gitignore for UniVote
+node_modules/
+venv/
+env/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+.env.*
+.vscode/
+.idea/
+/build/
+/.svelte-kit/
+/dist/

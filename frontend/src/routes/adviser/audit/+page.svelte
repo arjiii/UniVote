@@ -1,22 +1,41 @@
 <script>
 	import { onMount } from 'svelte';
-	import { adviser } from '$lib/api.js';
-	import GlassCard from '$lib/components/GlassCard.svelte';
-	import { fly, fade } from 'svelte/transition';
+	import { adviser as adviserApi } from '$lib/api.js';
+	import { fly } from 'svelte/transition';
 
 	/** @type {any[]} */
 	let logs = $state([]);
 	let isLoading = $state(true);
+	let pageHistory = $state([/** @type {string | null} */ (null)]);
+	let currentPage = $state(0);
+	let nextPageToken = $state(/** @type {string | null} */ (null));
 
-	async function loadLogs() {
+	async function loadLogs(/** @type {string | null} */ token = null) {
+		isLoading = true;
 		try {
-			const res = await adviser.getAuditLog(100);
+			const res = await adviserApi.getAuditLog(15, token);
 			logs = res.data || [];
+			nextPageToken = res.next_page_token || null;
 		} catch (err) {
 			console.error('Failed to load audit logs:', err);
 		} finally {
 			isLoading = false;
 		}
+	}
+
+	async function goNext() {
+		if (!nextPageToken || isLoading) return;
+		pageHistory.push(nextPageToken);
+		currentPage++;
+		await loadLogs(nextPageToken);
+	}
+
+	async function goPrev() {
+		if (currentPage === 0 || isLoading) return;
+		currentPage--;
+		pageHistory.pop();
+		const prevToken = pageHistory[currentPage];
+		await loadLogs(prevToken);
 	}
 
 	onMount(() => {
@@ -26,98 +45,78 @@
 	function formatAction(/** @type {string} */ action) {
 		return action.replace(/_/g, ' ').toLowerCase();
 	}
-
-	function formatDate(/** @type {string} */ dateStr) {
-		return new Date(dateStr).toLocaleString();
-	}
 </script>
 
-<svelte:head>
-	<title>System Audit Logs | UniVote</title>
-</svelte:head>
+<svelte:head><title>System Audit Logs | UniVote</title></svelte:head>
 
-<GlassCard
-	title="Operational History"
-	subtitle="Protocol Logs & Activity Ledger"
->
-	{#snippet headerExtra()}
-		<button 
-			onclick={loadLogs} 
-			class="btn-primary mt-4 lg:mt-0 px-6 py-3 rounded-2xl text-[10px] uppercase shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
+<div class="dash">
+	<div class="dash-header">
+		<div>
+			<p class="dash-eyebrow"><span class="prefix">Pages /</span> Audit Logs</p>
+			<h1 class="dash-title">Operational History</h1>
+		</div>
+		<button
+			onclick={() => { currentPage = 0; pageHistory = [null]; loadLogs(); }}
+			class="btn-primary mt-4 rounded-2xl px-6 py-3 text-[10px] uppercase shadow-xl lg:mt-0"
 		>
 			Refresh Protocol
 		</button>
-	{/snippet}
+	</div>
 
-	<div class="bg-surface-elevated border border-line-subtle rounded-[2.5rem] p-8" in:fly={{ y: 20, duration: 800 }}>
-		<div class="overflow-x-auto scrollbar-hide">
-			<table class="w-full text-left border-collapse min-w-[800px]">
+	<div class="rounded-[2.5rem] border border-line-subtle bg-surface-elevated p-8" in:fly={{ y: 20, duration: 800 }}>
+		<div class="scrollbar-hide overflow-x-auto">
+			<table class="w-full min-w-[800px] border-collapse text-left">
 				<thead>
-					<tr class="border-b border-line-main">
-						<th class="px-6 py-6 text-[9px] font-black uppercase tracking-[0.2em] text-content-muted">Stardate / Time</th>
-						<th class="px-6 py-6 text-[9px] font-black uppercase tracking-[0.2em] text-content-muted">Event</th>
-						<th class="px-6 py-6 text-[9px] font-black uppercase tracking-[0.2em] text-content-muted">Subject</th>
-						<th class="px-6 py-6 text-[9px] font-black uppercase tracking-[0.2em] text-content-muted">Metadata</th>
+					<tr style="border-bottom:1px solid var(--border-main);">
+						<th style="padding:1rem;font-size:0.6875rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Timestamp</th>
+						<th style="padding:1rem;font-size:0.6875rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Event</th>
+						<th style="padding:1rem;font-size:0.6875rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Subject Context</th>
+						<th style="padding:1rem;font-size:0.6875rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;text-align:right;">Status</th>
 					</tr>
 				</thead>
-				<tbody class="divide-y divide-line-subtle">
+				<tbody>
 					{#if isLoading}
 						{#each Array(6) as _}
-							<tr class="animate-pulse">
-								<td class="px-6 py-6"><div class="h-3 bg-surface-main rounded-full w-32 border border-line-main"></div></td>
-								<td class="px-6 py-6"><div class="h-3 bg-surface-main rounded-full w-24 border border-line-main"></div></td>
-								<td class="px-6 py-6"><div class="h-3 bg-surface-main rounded-full w-20 border border-line-main"></div></td>
-								<td class="px-6 py-6"><div class="h-3 bg-surface-main rounded-full w-40 border border-line-main"></div></td>
+							<tr class="animate-pulse" style="border-bottom:1px solid var(--border-subtle);">
+								<td style="padding:1rem;"><div style="height:0.75rem;background:var(--bg-elevated);border-radius:99px;width:8rem;"></div></td>
+								<td style="padding:1rem;"><div style="height:0.75rem;background:var(--bg-elevated);border-radius:99px;width:6rem;"></div></td>
+								<td style="padding:1rem;"><div style="height:0.75rem;background:var(--bg-elevated);border-radius:99px;width:12rem;"></div></td>
+								<td style="padding:1rem;"><div style="height:0.75rem;background:var(--bg-elevated);border-radius:99px;width:4rem;margin-left:auto;"></div></td>
 							</tr>
 						{/each}
 					{:else}
 						{#each logs as log}
-							<tr class="hover:bg-surface-hover transition-all group border-transparent border-l-4 hover:border-l-content-main">
-								<td class="px-6 py-6">
-									<div class="flex flex-col">
-										<span class="text-[10px] font-black text-content-main uppercase tracking-tight">{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-										<span class="text-[8px] font-black text-content-subtle uppercase tracking-widest mt-1">{new Date(log.created_at).toLocaleDateString()}</span>
-									</div>
+							<tr style="border-bottom:1px solid var(--border-subtle);transition:background-color 0.2s;" class="hover:bg-[var(--bg-hover)]">
+								<td style="padding:1rem;font-size:0.8125rem;color:var(--text-subtle);white-space:nowrap;">
+									<span style="font-family:monospace;font-weight:600;color:var(--text-main);">{new Date(log.created_at).toLocaleTimeString()}</span>
+									<div style="font-size:0.6875rem;">{new Date(log.created_at).toLocaleDateString()}</div>
 								</td>
-								<td class="px-6 py-6">
-									<span class="inline-flex items-center px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest bg-content-main text-surface-main">
+								<td style="padding:1rem;">
+									<span style="font-size:0.75rem;font-weight:700;color:var(--brand-primary);background:var(--brand-glow);padding:0.25rem 0.5rem;border-radius:4px;">
 										{formatAction(log.action)}
 									</span>
 								</td>
-								<td class="px-6 py-6">
-									<div class="flex flex-col">
-										<span class="text-[9px] font-black uppercase tracking-widest text-content-muted">{log.target_type || 'CORE'}</span>
-										<span class="text-[10px] font-mono text-content-main tracking-widest mt-0.5">{log.target_id?.substring(0,8) || 'SYSTEM'}</span>
+								<td style="padding:1rem;max-width:300px;">
+									<div style="font-size:0.8125rem;font-weight:600;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+										{log.target_type ? `Target: ${log.target_type.toUpperCase()}` : 'SYSTEM ROUTINE'}
 									</div>
 								</td>
-								<td class="px-6 py-6">
-									<div class="flex flex-wrap gap-2">
-										{#if log.details}
-											{#each Object.entries(log.details) as [key, value]}
-												<span class="text-[9px] bg-surface-main text-content-main px-2.5 py-1 rounded-md border border-line-main font-black uppercase tracking-tight hover:border-content-main transition-colors cursor-default">
-													<span class="text-content-muted">{key}:</span> {value}
-												</span>
-											{/each}
-										{:else}
-											<span class="text-[9px] text-content-subtle uppercase tracking-[0.2em] italic">No Protocol Meta</span>
-										{/if}
-									</div>
+								<td style="padding:1rem;text-align:right;">
+									<span style="font-size:0.75rem;font-weight:700;color:var(--status-success-fg);">OK</span>
 								</td>
 							</tr>
 						{:else}
-							<tr>
-								<td colspan="4" class="px-6 py-32 text-center">
-									<p class="text-[10px] font-black text-content-subtle uppercase tracking-[0.3em]">Protocol Log Vacant · Integrity Confirmed</p>
-								</td>
-							</tr>
+							<tr><td colspan="4" style="padding:4rem 1rem;text-align:center;color:var(--text-subtle);">Protocol Log Vacant</td></tr>
 						{/each}
 					{/if}
 				</tbody>
 			</table>
 		</div>
-		
-		<div class="px-8 py-6 flex items-center justify-between border-t border-line-main">
-			<span class="text-[9px] font-black text-content-subtle uppercase tracking-[0.2em]">Telemetry data · Latest 100 clusters indexed</span>
+
+		<div style="padding:1rem;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border-main);margin-top:2rem;">
+			<button onclick={goPrev} disabled={currentPage === 0 || isLoading} class="btn-secondary btn-sm">Previous</button>
+			<span style="font-size:0.75rem;font-weight:600;color:var(--text-muted);">Page {currentPage + 1}</span>
+			<button onclick={goNext} disabled={!nextPageToken || isLoading} class="btn-primary btn-sm">Next</button>
 		</div>
 	</div>
-</GlassCard>
+</div>

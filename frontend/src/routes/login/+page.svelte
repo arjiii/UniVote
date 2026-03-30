@@ -1,166 +1,279 @@
 <script>
-  import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
-  import { auth as authApi } from '$lib/api.js';
-  import { authSession } from '$lib/stores/auth.js';
-  import { theme, toggleTheme } from '$lib/stores/theme.js';
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { auth as authApi } from '$lib/api.js';
+	import { authSession } from '$lib/stores/auth.js';
+	import { theme, toggleTheme } from '$lib/stores/theme.js';
+	import GlassCard from '$lib/components/GlassCard.svelte';
+	import { fade, fly } from 'svelte/transition';
 
-  onMount(() => {
-    if ($authSession) goto($authSession.role === 'admin' ? '/admin' : '/adviser');
-  });
+	onMount(() => { if ($authSession) goto($authSession.role === 'admin' ? '/admin' : '/adviser'); });
 
-  let id = $state('');
-  let password = $state('');
-  let showPassword = $state(false);
-  let isSubmitting = $state(false);
-  let errorMessage = $state('');
+	let id = $state('');
+	let password = $state('');
+	let showPassword = $state(false);
+	let isSubmitting = $state(false);
+	let errorMessage = $state('');
 
-  async function handleLogin(/** @type {SubmitEvent} */ e) {
-    e.preventDefault();
-    if (!id || !password) { errorMessage = 'Please enter both ID and password.'; return; }
-    isSubmitting = true;
-    errorMessage = '';
-    try {
-      const data = await authApi.login(id, password);
-      authSession.login(data);
-      goto(data.role === 'admin' ? '/admin' : '/adviser');
-    } catch (/** @type {any} */ err) {
-      errorMessage = err.message ?? 'Sign in failed. Please check your credentials.';
-    } finally { isSubmitting = false; }
-  }
+	async function handleLogin(/** @type {SubmitEvent} */ e) {
+		e.preventDefault();
+		if (!id || !password) { errorMessage = 'Please enter both ID and password.'; return; }
+		isSubmitting = true; errorMessage = '';
+		try {
+			const data = await authApi.login(id, password);
+			authSession.login(data);
+			goto(data.role === 'admin' ? '/admin' : '/adviser');
+		} catch (/** @type {any} */ err) {
+			errorMessage = err.message ?? 'Sign in failed. Please check your credentials.';
+		} finally { isSubmitting = false; }
+	}
 </script>
 
 <svelte:head><title>Sign In | UniVote</title></svelte:head>
 
-<div class="login-page" class:dark={$theme === 'dark'}>
+<div class="auth-page">
+	<div class="sphere sphere-1"></div>
+	<div class="sphere sphere-2"></div>
+	<div class="sphere sphere-3"></div>
+	<div class="sphere sphere-4"></div>
 
-  <!-- Topbar -->
-  <nav class="login-topbar">
-    <div style="display:flex;align-items:center;gap:0.5rem;">
-      <button onclick={toggleTheme} class="login-logo" title="Toggle theme">U</button>
-      <span style="font-size:0.9375rem;font-weight:700;color:var(--text-main);">UniVote</span>
-    </div>
-    <a href="/" style="font-size:0.75rem;color:var(--text-subtle);text-decoration:none;display:flex;align-items:center;gap:0.25rem;">
-      <svg style="width:0.875rem;height:0.875rem;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-      Back to home
-    </a>
-  </nav>
+	<!-- Desktop card -->
+	<div class="auth-card">
+		<div class="auth-left">
+			<div class="auth-brand">
+				<button onclick={toggleTheme} class="auth-logo-btn">
+					<img src="/Messenger_creation_1261776042047231.jpeg" alt="UniVote Logo" class="auth-logo" />
+				</button>
+				<span class="auth-brand-name">UNIVOTE</span>
+			</div>
 
-  <!-- Form wrapper -->
-  <div class="login-body">
-    <div class="login-card admin-card">
+			<div class="auth-hero">
+				<h2 class="auth-hero-title">MANAGE<br /><span class="auth-hero-accent">ELECTIONS.</span></h2>
+				<p class="auth-hero-desc">
+					SIGN IN TO CREATE ELECTIONS, MANAGE CANDIDATES, AND MONITOR VOTING RESULTS IN REAL TIME.
+				</p>
+				<div class="auth-features">
+					{#each ['CREATE & MANAGE ELECTIONS', 'TRACK VOTES IN REAL TIME', 'FULL AUDIT TRAIL & REPORTS'] as feature}
+						<div class="auth-feature-item">
+							<div class="auth-feature-check">
+								<svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="4" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+								</svg>
+							</div>
+							<span>{feature}</span>
+						</div>
+					{/each}
+				</div>
+			</div>
 
-      <div style="margin-bottom:1.5rem;">
-        <h1 style="font-size:1.25rem;font-weight:700;color:var(--text-main);">Staff Sign In</h1>
-        <p style="font-size:0.8125rem;color:var(--text-muted);margin-top:0.25rem;">Enter your credentials to access the administration portal.</p>
-      </div>
+			<p class="auth-footer-text">© 2025 UNIVOTE</p>
+		</div>
 
-      <form onsubmit={handleLogin} style="display:flex;flex-direction:column;gap:1rem;">
-        <div>
-          <label class="field-label" for="id">Staff / Employee ID</label>
-          <input
-            type="text"
-            id="id"
-            class="input-base"
-            bind:value={id}
-            placeholder="e.g. 2024-001"
-            autocomplete="username"
-            required
-          />
-        </div>
+		<div class="auth-right">
+			<div class="accent-sphere accent-sphere-br"></div>
 
-        <div>
-          <label class="field-label" for="password">Password</label>
-          <div style="position:relative;">
-            <input
-              type={showPassword ? 'text' : 'password'}
-              id="password"
-              class="input-base"
-              bind:value={password}
-              placeholder="••••••••"
-              autocomplete="current-password"
-              style="padding-right:2.5rem;"
-              required
-            />
-            <button
-              type="button"
-              onclick={() => showPassword = !showPassword}
-              class="btn-icon"
-              style="position:absolute;right:0.375rem;top:50%;transform:translateY(-50%);"
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-            >
-              {#if showPassword}
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/></svg>
-              {:else}
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-              {/if}
-            </button>
-          </div>
-        </div>
+			<div class="auth-form-container" in:fade={{ duration: 400 }}>
+				<h1 class="form-title">STAFF SIGN IN</h1>
+				<p class="form-subtitle">ENTER YOUR CREDENTIALS</p>
 
-        {#if errorMessage}
-          <div style="padding:0.625rem 0.75rem;background-color:var(--status-danger-bg);border:1px solid rgba(220,38,38,0.2);border-radius:6px;font-size:0.75rem;color:var(--status-danger-fg);font-weight:500;">
-            {errorMessage}
-          </div>
-        {/if}
+				<form onsubmit={handleLogin} class="auth-form">
+					<div class="auth-field">
+						<label class="field-label" for="id">STAFF / EMPLOYEE ID</label>
+						<div class="input-icon-wrap">
+							<svg class="input-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
+							<input type="text" id="id" class="input-base input-with-icon w-full uppercase" bind:value={id} placeholder="E.G. ADM-2024" autocomplete="username" required />
+						</div>
+					</div>
 
-        <button type="submit" disabled={isSubmitting} class="btn-primary" style="width:100%;margin-top:0.25rem;padding:0.625rem 1rem;font-size:0.875rem;">
-          {#if isSubmitting}
-            <div class="spinner" style="width:1rem;height:1rem;border-width:2px;border-top-color:#fff;"></div>
-            Signing in…
-          {:else}
-            Sign In
-          {/if}
-        </button>
-      </form>
+					<div class="auth-field">
+						<label class="field-label" for="password">PASSWORD</label>
+						<div class="input-icon-wrap">
+							<svg class="input-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
+							<input type={showPassword ? 'text' : 'password'} id="password" class="input-base input-with-icon w-full pr-20" bind:value={password} placeholder="••••••••" autocomplete="current-password" required />
+							<button type="button" onclick={() => (showPassword = !showPassword)} class="show-toggle">
+								{showPassword ? 'HIDE' : 'SHOW'}
+							</button>
+						</div>
+					</div>
 
-      <div style="margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid var(--border-main);display:flex;align-items:center;justify-content:space-between;">
-        <p style="font-size:0.75rem;color:var(--text-muted);">
-          No account?
-          <a href="/register" style="color:var(--brand-primary);text-decoration:none;font-weight:500;">Register here</a>
-        </p>
-        <a href="/student/validate" style="font-size:0.75rem;color:var(--text-subtle);text-decoration:none;">Student login →</a>
-      </div>
-    </div>
-  </div>
+					{#if errorMessage}
+						<div class="pill pill-danger w-full py-3" in:fly={{ y: 5, duration: 200 }}>
+							<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+							</svg>
+							<span class="font-bold tracking-tight">{errorMessage}</span>
+						</div>
+					{/if}
+
+					<button type="submit" disabled={isSubmitting} class="auth-btn-primary">
+						{#if isSubmitting}
+							<div class="flex items-center gap-3">
+								<div class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+								SIGNING IN...
+							</div>
+						{:else}
+							SIGN IN
+						{/if}
+					</button>
+				</form>
+
+				<div class="form-divider"><span>OR</span></div>
+				<a href="/register" class="auth-btn-outline">CREATE AN ACCOUNT</a>
+
+				<div class="form-links">
+					<a href="/" class="form-link">BACK TO HOME →</a>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Mobile -->
+	<div class="auth-mobile">
+		<div class="auth-mobile-header">
+			<button onclick={toggleTheme} class="auth-logo-btn auth-logo-btn-mobile">
+				<img src="/Messenger_creation_1261776042047231.jpeg" alt="UniVote Logo" class="auth-logo auth-logo-lg" />
+			</button>
+			<h1 class="auth-mobile-title">UNIVOTE</h1>
+			<p class="auth-mobile-sub">STAFF PORTAL</p>
+		</div>
+
+		<div class="auth-mobile-card">
+			<h2 class="form-title">STAFF SIGN IN</h2>
+			<p class="form-subtitle">ENTER YOUR CREDENTIALS</p>
+
+			<form onsubmit={handleLogin} class="auth-form">
+				<div class="auth-field">
+					<label class="field-label" for="idMobile">STAFF / EMPLOYEE ID</label>
+					<div class="input-icon-wrap">
+						<svg class="input-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
+						<input type="text" id="idMobile" class="input-base input-with-icon w-full uppercase" bind:value={id} placeholder="E.G. ADM-2024" autocomplete="username" required />
+					</div>
+				</div>
+
+				<div class="auth-field">
+					<label class="field-label" for="passwordMobile">PASSWORD</label>
+					<div class="input-icon-wrap">
+						<svg class="input-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
+						<input type={showPassword ? 'text' : 'password'} id="passwordMobile" class="input-base input-with-icon w-full pr-20" bind:value={password} placeholder="••••••••" autocomplete="current-password" required />
+						<button type="button" onclick={() => (showPassword = !showPassword)} class="show-toggle">
+							{showPassword ? 'HIDE' : 'SHOW'}
+						</button>
+					</div>
+				</div>
+
+				{#if errorMessage}
+					<div class="pill pill-danger w-full py-3" in:fly={{ y: 5, duration: 200 }}>
+						<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+						</svg>
+						<span class="font-bold">{errorMessage}</span>
+					</div>
+				{/if}
+
+				<button type="submit" disabled={isSubmitting} class="auth-btn-primary">
+					{#if isSubmitting}
+						<div class="flex items-center gap-3">
+							<div class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+							SIGNING IN...
+						</div>
+					{:else}
+						SIGN IN
+					{/if}
+				</button>
+			</form>
+
+			<div class="form-divider"><span>OR</span></div>
+			<a href="/register" class="auth-btn-outline">CREATE AN ACCOUNT</a>
+			<div class="form-links">
+				<a href="/" class="form-link">BACK TO HOME →</a>
+			</div>
+		</div>
+
+		<p class="auth-mobile-copyright">© 2025 UNIVOTE</p>
+	</div>
 </div>
 
 <style>
-  :global(body) { background-color: var(--bg-main); }
+	.auth-page { position: relative; min-height: 100vh; background: linear-gradient(135deg, #0b75fe 0%, #0052cc 50%, #003d99 100%); overflow: hidden; }
 
-  .login-page {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background-color: var(--bg-main);
-  }
-  .login-topbar {
-    height: 52px;
-    background-color: var(--bg-card);
-    border-bottom: 1px solid var(--border-main);
-    padding: 0 1.5rem;
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .login-logo {
-    width: 28px; height: 28px;
-    background-color: var(--brand-primary); color: #fff;
-    border-radius: 6px; font-size: 0.75rem; font-weight: 800;
-    border: none; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: background-color 0.15s;
-  }
-  .login-logo:hover { background-color: var(--brand-primary-h); }
+	.auth-card { display: none; position: relative; z-index: 2; width: 90%; max-width: 1100px; min-height: 600px; margin: auto; border-radius: 20px; overflow: hidden; box-shadow: 0 25px 80px rgba(0,0,0,0.25); }
+	@media (min-width: 1024px) { .auth-page { display: flex; align-items: center; justify-content: center; } .auth-card { display: flex; } .auth-mobile { display: none !important; } }
 
-  .login-body {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem 1.5rem;
-  }
-  .login-card {
-    width: 100%;
-    max-width: 380px;
-    padding: 1.75rem;
-  }
+	.auth-left { width: 42%; display: flex; flex-direction: column; justify-content: space-between; padding: 2.5rem; position: relative; z-index: 1; }
+	.auth-brand { display: flex; align-items: center; gap: 0.75rem; }
+	.auth-logo-btn { display: flex; align-items: center; justify-content: center; border: none; background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); border-radius: 12px; padding: 5px; cursor: pointer; transition: transform 0.2s, background 0.2s; outline: none; }
+	.auth-logo-btn:hover { transform: scale(1.08) rotate(3deg); background: rgba(255,255,255,0.25); }
+	.auth-logo { width: 38px; height: 38px; border-radius: 8px; object-fit: contain; }
+	.auth-logo-lg { width: 64px; height: 64px; border-radius: 14px; }
+	@media (min-width: 640px) { .auth-logo-lg { width: 72px; height: 72px; } }
+	.auth-brand-name { font-size: 1.1rem; font-weight: 900; color: white; letter-spacing: 0.05em; }
+
+	.auth-hero { max-width: 300px; }
+	.auth-hero-title { font-size: 2.75rem; font-weight: 900; line-height: 1; color: white; letter-spacing: -0.02em; margin-bottom: 1rem; }
+	.auth-hero-accent { color: rgba(255,255,255,0.45); }
+	.auth-hero-desc { font-size: 0.55rem; font-weight: 600; letter-spacing: 0.12em; color: rgba(255,255,255,0.55); line-height: 1.8; margin-bottom: 1.5rem; }
+	.auth-features { display: flex; flex-direction: column; gap: 0.75rem; }
+	.auth-feature-item { display: flex; align-items: center; gap: 0.6rem; font-size: 0.5rem; font-weight: 700; letter-spacing: 0.15em; color: rgba(255,255,255,0.7); }
+	.auth-feature-check { width: 22px; height: 22px; border-radius: 7px; background: rgba(255,255,255,0.18); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; color: white; flex-shrink: 0; }
+	.auth-footer-text { font-size: 0.45rem; font-weight: 700; letter-spacing: 0.25em; color: rgba(255,255,255,0.3); }
+
+	.auth-right { flex: 1; background: var(--bg-main); padding: 2.5rem 3rem; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; border-radius: 0 20px 20px 0; }
+	:global(.dark) .auth-right { background: var(--bg-card); }
+
+	.accent-sphere { position: absolute; border-radius: 50%; pointer-events: none; z-index: 0; }
+	.accent-sphere-br { width: 160px; height: 160px; bottom: -50px; right: -50px; background: radial-gradient(circle at 35% 35%, rgba(11,117,254,0.2), rgba(0,82,204,0.5) 60%, rgba(0,50,140,0.7)); box-shadow: inset -4px -4px 10px rgba(0,0,0,0.2); animation: sphereBob2 14s ease-in-out infinite; }
+
+	.auth-form-container { position: relative; z-index: 1; width: 100%; max-width: 380px; }
+	.form-title { font-size: 1.75rem; font-weight: 900; color: var(--text-main); letter-spacing: -0.01em; margin: 0 0 0.25rem; }
+	.form-subtitle { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.12em; color: var(--text-subtle); margin: 0 0 1.5rem; }
+
+	.auth-form { display: flex; flex-direction: column; gap: 1rem; }
+	.auth-field { display: flex; flex-direction: column; gap: 0.35rem; }
+
+	.input-icon-wrap { position: relative; }
+	.input-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--text-subtle); opacity: 0.5; pointer-events: none; }
+	.input-with-icon { padding-left: 2.5rem !important; }
+
+	.show-toggle {
+		position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+		border: none; background: transparent; color: var(--text-subtle);
+		font-size: 0.6rem; font-weight: 800; letter-spacing: 0.1em; cursor: pointer;
+		transition: color 0.2s;
+	}
+	.show-toggle:hover { color: var(--brand-primary); }
+
+	.auth-btn-primary { width: 100%; padding: 0.875rem; background: linear-gradient(135deg, #1a1a2e, #16213e); color: white; border: none; border-radius: 10px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.2em; cursor: pointer; transition: all 0.2s; text-transform: uppercase; }
+	.auth-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.2); }
+	.auth-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+	.form-divider { display: flex; align-items: center; gap: 1rem; margin: 1rem 0; }
+	.form-divider::before, .form-divider::after { content: ''; flex: 1; height: 1px; background: var(--border-main); }
+	.form-divider span { font-size: 0.55rem; font-weight: 700; letter-spacing: 0.15em; color: var(--text-subtle); }
+
+	.auth-btn-outline { display: block; width: 100%; padding: 0.75rem; border: 1.5px solid var(--border-main); border-radius: 10px; background: transparent; color: var(--text-main); font-size: 0.65rem; font-weight: 800; letter-spacing: 0.15em; text-align: center; text-decoration: none; text-transform: uppercase; cursor: pointer; transition: all 0.2s; }
+	.auth-btn-outline:hover { border-color: var(--brand-primary); color: var(--brand-primary); }
+
+	.form-links { margin-top: 1rem; text-align: center; }
+	.form-link { font-size: 0.55rem; font-weight: 700; letter-spacing: 0.15em; color: var(--text-subtle); text-decoration: none; text-transform: uppercase; transition: color 0.2s; }
+	.form-link:hover { color: var(--text-main); }
+
+	.sphere { position: absolute; border-radius: 50%; z-index: 1; }
+	.sphere-1 { width: 320px; height: 320px; bottom: -80px; left: -60px; background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15), rgba(0,82,204,0.5) 50%, rgba(0,40,120,0.8)); box-shadow: inset -10px -10px 30px rgba(0,0,0,0.3), 0 25px 80px rgba(0,0,0,0.15); animation: sphereBob1 10s ease-in-out infinite; }
+	.sphere-2 { width: 140px; height: 140px; top: 40px; right: 8%; background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2), rgba(0,100,230,0.4) 60%, rgba(0,60,160,0.6)); box-shadow: inset -5px -5px 15px rgba(0,0,0,0.2), 0 15px 40px rgba(0,0,0,0.1); animation: sphereBob2 12s ease-in-out infinite; }
+	.sphere-3 { width: 70px; height: 70px; top: 60%; left: 35%; background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.25), rgba(0,120,255,0.3) 70%); box-shadow: inset -3px -3px 8px rgba(0,0,0,0.15); animation: sphereBob3 14s ease-in-out infinite; }
+	.sphere-4 { width: 45px; height: 45px; top: 20%; left: 30%; background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3), rgba(0,100,220,0.25) 70%); animation: sphereBob2 16s ease-in-out infinite reverse; }
+
+	@keyframes sphereBob1 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(15px, -25px); } }
+	@keyframes sphereBob2 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-12px, 18px) scale(1.06); } }
+	@keyframes sphereBob3 { 0%, 100% { transform: translate(0, 0); } 33% { transform: translate(12px, -12px); } 66% { transform: translate(-8px, 10px); } }
+
+	.auth-mobile { display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 2rem 1.25rem; z-index: 2; position: relative; }
+	@media (min-width: 1024px) { .auth-mobile { display: none; } }
+	.auth-mobile-header { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; }
+	.auth-logo-btn-mobile { background: rgba(255,255,255,0.2); }
+	.auth-mobile-title { font-size: 1.75rem; font-weight: 900; color: white; letter-spacing: 0.05em; }
+	.auth-mobile-sub { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.2em; color: rgba(255,255,255,0.6); }
+	.auth-mobile-card { width: 100%; max-width: 420px; background: var(--bg-main); border-radius: 20px; padding: 1.75rem; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+	:global(.dark) .auth-mobile-card { background: var(--bg-card); }
+	.auth-mobile-copyright { margin-top: auto; padding-top: 1.5rem; font-size: 0.5rem; font-weight: 700; letter-spacing: 0.2em; color: rgba(255,255,255,0.3); }
 </style>

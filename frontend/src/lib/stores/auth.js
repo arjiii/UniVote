@@ -10,36 +10,38 @@ import { browser } from '$app/environment';
  */
 
 function createAuthStore() {
-  const isBrowser = typeof window !== 'undefined';
-  
-  // Read initial state from localStorage if available
-  const initialData = isBrowser ? localStorage.getItem('univote_admin_session') : null;
-  /** @type {AdminAdviserSession | null} */
-  let parsed = null;
-  try {
-    parsed = (initialData && initialData !== 'undefined') ? JSON.parse(initialData) : null;
-  } catch { parsed = null; }
-  
-  const { subscribe, set, update } = writable(parsed);
+	const isBrowser = typeof window !== 'undefined';
 
-  return {
-    subscribe,
-    /**
-     * @param {AdminAdviserSession} sessionData
-     */
-    login: (sessionData) => {
-      set(sessionData);
-      if (isBrowser) {
-        localStorage.setItem('univote_admin_session', JSON.stringify(sessionData));
-      }
-    },
-    logout: () => {
-      set(null);
-      if (isBrowser) {
-        localStorage.removeItem('univote_admin_session');
-      }
-    }
-  };
+	// Read initial state from localStorage if available
+	const initialData = isBrowser ? localStorage.getItem('univote_admin_session') : null;
+	/** @type {AdminAdviserSession | null} */
+	let parsed = null;
+	try {
+		parsed = initialData && initialData !== 'undefined' ? JSON.parse(initialData) : null;
+	} catch {
+		parsed = null;
+	}
+
+	const { subscribe, set, update } = writable(parsed);
+
+	return {
+		subscribe,
+		/**
+		 * @param {AdminAdviserSession} sessionData
+		 */
+		login: (sessionData) => {
+			set(sessionData);
+			if (isBrowser) {
+				localStorage.setItem('univote_admin_session', JSON.stringify(sessionData));
+			}
+		},
+		logout: () => {
+			set(null);
+			if (isBrowser) {
+				localStorage.removeItem('univote_admin_session');
+			}
+		}
+	};
 }
 
 export const authSession = createAuthStore();

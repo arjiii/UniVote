@@ -3,6 +3,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { theme } from '$lib/stores/theme.js';
 	import { onMount } from 'svelte';
+	import PageProgressBar from '$lib/components/PageProgressBar.svelte';
 
 	let { children } = $props();
 
@@ -19,4 +20,7 @@
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
+
+<PageProgressBar />
+
 {@render children()}

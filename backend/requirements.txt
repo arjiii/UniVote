@@ -6,3 +6,4 @@ python-dotenv
 python-multipart
 passlib[argon2]
 slowapi
+gunicorn
