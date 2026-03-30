@@ -121,14 +121,14 @@ def _generate_receipt_id(student_uuid: str, election_id: str) -> str:
 
 
 async def cast_votes(
-    student_id_str: str, election_id: str, votes: list, voting_pin: str
+    student_id: str, election_id: str, votes: list, voting_pin: str
 ) -> dict:
     """Insert vote records via RPC and mark the student as voted. Returns receipt info."""
     supabase = await get_async_supabase()
     student_result = (
         await supabase.table("students")
         .select("id, voting_pin")
-        .eq("student_id", student_id_str)
+        .eq("student_id", student_id)
         .execute()
     )
 
