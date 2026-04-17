@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { admin, adviser } from '$lib/api.js';
 	import { selectedElectionId } from '$lib/stores/election.js';
+	import { branding } from '$lib/stores/branding.js';
 	import { POSITION_ORDER, sortPositions } from '$lib/constants.js';
 
 	/** @type {any[]} */
@@ -16,6 +17,21 @@
 	let isSubmitting = $state(false);
 	let errorMessage = $state('');
 	let successMessage = $state('');
+	/** @type {string | null} */
+	let newCandidatePhotoPreview = $state(null);
+	/** @type {string | null} */
+	let newCandidatePhotoBase64 = $state(null);
+	/** @type {Record<string, boolean>} */
+	let uploading = $state({});
+	
+	/** @type {any[]} */
+	let studentSuggestions = $state([]);
+	let isSearchingStudents = $state(false);
+	let showSuggestions = $state(false);
+	let isLoading = $state(false);
+	/** @type {any} */
+	let searchTimeout;
+
 
 	async function loadElections() {
 		try {
@@ -28,6 +44,7 @@
 
 	async function loadData() {
 		if (!$selectedElectionId) return;
+		isLoading = true;
 		try {
 			const [pRes, cRes] = await Promise.all([
 				adviser.getPartylists($selectedElectionId),
@@ -37,12 +54,90 @@
 			candidates = cRes.data || [];
 		} catch (err) {
 			console.error('Failed to load data:', err);
+		} finally {
+			isLoading = false;
 		}
 	}
 
-	onMount(async () => {
-		await loadElections();
-		if ($selectedElectionId) await loadData();
+	/**
+	 * Convert a File to base64 data URL
+	 * @param {File} file
+	 * @returns {Promise<string>}
+	 */
+	function fileToBase64(file) {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => resolve(/** @type {string} */ (reader.result));
+			reader.onerror = reject;
+			reader.readAsDataURL(file);
+		});
+	}
+
+	/** @param {Event} e */
+	async function handleNewPhotoSelect(e) {
+		const input = /** @type {HTMLInputElement} */ (e.target);
+		const file = input.files?.[0];
+		if (!file) return;
+		try {
+			const base64 = await fileToBase64(file);
+			newCandidatePhotoBase64 = base64;
+			newCandidatePhotoPreview = base64;
+		} catch {
+			errorMessage = 'Failed to read image. Try another file.';
+		}
+	}
+
+	function clearNewPhoto() {
+		newCandidatePhotoBase64 = null;
+		newCandidatePhotoPreview = null;
+	}
+
+	/**
+	 * @param {string} candidateId
+	 * @param {Event} e
+	 */
+	async function handlePhotoUpload(candidateId, e) {
+		const input = /** @type {HTMLInputElement} */ (e.target);
+		const file = input.files?.[0];
+		if (!file) return;
+		uploading[candidateId] = true;
+		try {
+			const base64 = await fileToBase64(file);
+			await adviser.uploadCandidatePhoto(candidateId, base64);
+			// Update local state
+			candidates = candidates.map((c) =>
+				c.id === candidateId ? { ...c, photo_url: base64 } : c
+			);
+			successMessage = 'Photo updated!';
+			setTimeout(() => (successMessage = ''), 2500);
+		} catch (/** @type {any} */ err) {
+			errorMessage = err.message || 'Failed to upload photo.';
+		} finally {
+			uploading[candidateId] = false;
+			input.value = '';
+		}
+	}
+
+	/** @param {string} candidateId */
+	async function removePhoto(candidateId) {
+		uploading[candidateId] = true;
+		try {
+			await adviser.deleteCandidatePhoto(candidateId);
+			candidates = candidates.map((c) =>
+				c.id === candidateId ? { ...c, photo_url: null } : c
+			);
+		} catch (/** @type {any} */ err) {
+			errorMessage = err.message || 'Failed to remove photo.';
+		} finally {
+			uploading[candidateId] = false;
+		}
+	}
+
+	onMount(() => {
+		// Parallelize election loading and data loading if possible
+		loadElections().then(() => {
+			if ($selectedElectionId) loadData();
+		});
 	});
 
 	$effect(() => {
@@ -50,6 +145,36 @@
 			loadData();
 		}
 	});
+
+	async function handleStudentIdInput() {
+		const query = newCandidate.student_id;
+		if (query.length < 2) {
+			studentSuggestions = [];
+			showSuggestions = false;
+			return;
+		}
+
+		clearTimeout(searchTimeout);
+		searchTimeout = setTimeout(async () => {
+			isSearchingStudents = true;
+			try {
+				const res = await adviser.searchStudents(query);
+				studentSuggestions = res.data || [];
+				showSuggestions = studentSuggestions.length > 0;
+			} catch (err) {
+				console.error('Student search failed:', err);
+			} finally {
+				isSearchingStudents = false;
+			}
+		}, 300);
+	}
+
+	/** @param {any} student */
+	function selectStudent(student) {
+		newCandidate.student_id = student.student_id;
+		showSuggestions = false;
+		studentSuggestions = [];
+	}
 
 	/** @param {SubmitEvent} e */
 	async function handleAddCandidate(e) {
@@ -70,14 +195,32 @@
 				return;
 			}
 
-			await adviser.createCandidate($selectedElectionId, {
+			const createRes = await adviser.createCandidate($selectedElectionId, {
 				student_id: newCandidate.student_id,
 				position: finalPosition,
 				partylist_id: newCandidate.partylist_id || null
 			});
+
+			// Upload photo if one was selected
+			if (newCandidatePhotoBase64) {
+				// The backend returns { message, data: [...] } where data is the inserted row
+				const newId = createRes?.data?.[0]?.id || createRes?.data?.id || createRes?.id;
+				if (newId) {
+					try {
+						await adviser.uploadCandidatePhoto(newId, newCandidatePhotoBase64);
+					} catch (err) {
+						console.error('Initial photo upload failed:', err);
+						successMessage = 'Candidate added. Photo upload failed — you can retry on the card.';
+					}
+				}
+				newCandidatePhotoBase64 = null;
+				newCandidatePhotoPreview = null;
+			}
+
 			newCandidate = { student_id: '', position: '', partylist_id: '' };
 			customPosition = '';
-			successMessage = 'Candidate added successfully!';
+			if (!successMessage) successMessage = 'Candidate added successfully!';
+			setTimeout(() => (successMessage = ''), 3000);
 			await loadData();
 		} catch (/** @type {any} */ err) {
 			errorMessage = err.message || 'Failed to add candidate.';
@@ -123,7 +266,61 @@
 	}
 </script>
 
-<svelte:head><title>Candidates | UniVote</title></svelte:head>
+<style>
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	.suggestions-dropdown {
+		position: absolute;
+		top: 100%;
+		left: 0;
+		right: 0;
+		z-index: 50;
+		background: #111827; /* Solid dark background for contrast */
+		backdrop-filter: blur(8px);
+		border: 1px solid var(--border-main);
+		border-radius: 8px;
+		margin-top: 4px;
+		max-height: 200px;
+		overflow-y: auto;
+		box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+	}
+
+	.suggestion-item {
+		width: 100%;
+		padding: 0.625rem 0.875rem;
+		border: none;
+		background: none;
+		cursor: pointer;
+		border-bottom: 1px solid var(--border-subtle);
+		display: flex;
+		transition: background 0.15s;
+	}
+
+	.suggestion-item:last-child {
+		border-bottom: none;
+	}
+
+	.suggestion-item:hover {
+		background: var(--bg-elevated);
+	}
+
+	.suggestion-id {
+		font-size: 0.75rem;
+		font-weight: 700;
+		color: var(--brand-primary, #0b75fe);
+	}
+
+	.suggestion-name {
+		font-size: 0.6875rem;
+		color: var(--text-muted);
+	}
+</style>
+
+<svelte:head><title>Candidates | {$branding.appName}</title></svelte:head>
 
 <div class="dash">
 	<div class="dash-header">
@@ -139,7 +336,7 @@
 				id="election-select"
 				bind:value={$selectedElectionId}
 				class="input-base"
-				style="width:220px;padding:0.375rem 0.75rem;font-size:0.8125rem;"
+				style="min-width:200px; width:auto; max-width:450px; padding:0.375rem 0.75rem; font-size:0.8125rem;"
 			>
 				<option value="" disabled>Select Election...</option>
 				{#each elections as election}
@@ -162,15 +359,35 @@
 				</div>
 
 				<form onsubmit={handleAddCandidate} style="display:flex;flex-direction:column;gap:1rem;">
-					<div>
+					<div style="position:relative;">
 						<label class="field-label" for="student-id">Student ID *</label>
 						<input
 							id="student-id"
 							type="text"
 							bind:value={newCandidate.student_id}
+							oninput={handleStudentIdInput}
+							onfocus={() => { if(studentSuggestions.length > 0) showSuggestions = true; }}
+							onblur={() => { setTimeout(() => showSuggestions = false, 200); }}
 							class="input-base"
 							placeholder="e.g. 2021-00123"
+							autocomplete="off"
 						/>
+						{#if showSuggestions}
+							<div class="suggestions-dropdown">
+								{#each studentSuggestions as student}
+									<button
+										type="button"
+										class="suggestion-item"
+										onclick={() => selectStudent(student)}
+									>
+										<div class="flex flex-col text-left">
+											<span class="suggestion-id">{student.student_id}</span>
+											<span class="suggestion-name">{student.full_name}</span>
+										</div>
+									</button>
+								{/each}
+							</div>
+						{/if}
 					</div>
 
 					<div>
@@ -205,6 +422,74 @@
 								<option value={party.id}>{party.name}</option>
 							{/each}
 						</select>
+					</div>
+
+
+
+					<!-- Profile Photo (optional) -->
+					<div>
+						<span class="field-label"
+							>Photo <span style="font-weight:400;opacity:0.65;">(optional)</span></span
+						>
+						<div style="display:flex;align-items:center;gap:0.75rem;margin-top:0.375rem;">
+							{#if newCandidatePhotoPreview}
+								<img
+									src={newCandidatePhotoPreview}
+									alt="Preview"
+									style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--brand-primary,#0b75fe);flex-shrink:0;"
+								/>
+							{:else}
+								<div
+									style="width:52px;height:52px;border-radius:50%;background:var(--bg-elevated);border:2px dashed var(--border-main);display:grid;place-items:center;flex-shrink:0;color:var(--text-muted);"
+								>
+									<svg
+										width="18"
+										height="18"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										viewBox="0 0 24 24"
+										><path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+										/><circle cx="12" cy="13" r="3" /></svg
+									>
+								</div>
+							{/if}
+							<div style="display:flex;flex-direction:column;gap:0.3rem;">
+								<label
+									style="display:inline-flex;align-items:center;gap:0.375rem;font-size:0.75rem;font-weight:600;color:var(--brand-primary,#0b75fe);cursor:pointer;padding:0.3rem 0.65rem;border:1.5px solid var(--brand-primary,#0b75fe);border-radius:6px;width:fit-content;"
+								>
+									<svg
+										width="11"
+										height="11"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2.5"
+										viewBox="0 0 24 24"
+										><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline
+											points="17 8 12 3 7 8"
+										/><line x1="12" y1="3" x2="12" y2="15" /></svg
+									>
+									{newCandidatePhotoPreview ? 'Change' : 'Upload Photo'}
+									<input
+										type="file"
+										accept="image/*"
+										style="display:none;"
+										onchange={handleNewPhotoSelect}
+									/>
+								</label>
+								{#if newCandidatePhotoPreview}
+									<button
+										type="button"
+										onclick={clearNewPhoto}
+										style="font-size:0.65rem;font-weight:700;color:var(--status-danger-fg);background:none;border:none;cursor:pointer;padding:0;text-align:left;"
+										>✕ Remove</button
+									>
+								{/if}
+							</div>
+						</div>
 					</div>
 
 					{#if errorMessage}
@@ -244,7 +529,20 @@
 					<span class="pill pill-neutral">{candidates.length} candidates</span>
 				</div>
 
-				{#if candidates.length === 0}
+				{#if isLoading}
+					<div style="display:flex;flex-direction:column;gap:2rem;">
+						{#each [1, 2] as i}
+							<div>
+								<div class="skeleton" style="width:120px;height:12px;margin-bottom:1rem;border-radius:4px;"></div>
+								<div class="bento-grid bento-2col" style="gap:0.75rem;">
+									{#each [1, 2, 3, 4] as j}
+										<div class="profile-card skeleton" style="height:70px;border-color:var(--border-subtle);opacity:0.5;"></div>
+									{/each}
+								</div>
+							</div>
+						{/each}
+					</div>
+				{:else if candidates.length === 0}
 					<div class="empty-state" style="border:none;">
 						No candidates registered for this election yet.
 					</div>
@@ -265,24 +563,51 @@
 										class="profile-card"
 										style="padding:0.75rem 1rem;display:flex;align-items:center;gap:1rem;border-color:var(--border-subtle);box-shadow:none;"
 									>
-										<div class="avatar-initial" style="width:36px;height:36px;flex-shrink:0;">
-											{(name || '??')
-												.split(' ')
-												.slice(0, 2)
-												.map(/** @param {string} w */ (w) => w[0]?.toUpperCase() || '')
-												.join('')}
+										<!-- Photo with upload overlay -->
+										<div style="position:relative;flex-shrink:0;">
+											{#if candidate.id}
+												{@const photoUrl = adviser.getCandidatePhotoUrl(candidate.id)}
+												<img 
+													src={photoUrl} 
+													alt={name} 
+													loading="lazy"
+													onerror={(e) => { 
+														const target = /** @type {HTMLImageElement} */ (e.currentTarget);
+														const next = /** @type {HTMLElement} */ (target.nextElementSibling);
+														target.style.display = 'none'; 
+														if (next) next.style.display = 'flex'; 
+													}}
+													style="width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid var(--border-main);" 
+												/>
+												<div class="avatar-initial" style="width:42px;height:42px;display:none;">
+													{(name || '??').split(' ').slice(0, 2).map((/** @type {string} */ w) => w[0]?.toUpperCase() || '').join('')}
+												</div>
+											{:else}
+												<div class="avatar-initial" style="width:42px;height:42px;">
+													{(name || '??').split(' ').slice(0, 2).map((/** @type {string} */ w) => w[0]?.toUpperCase() || '').join('')}
+												</div>
+											{/if}
+											{#if isModifiable()}
+												<label title="Upload photo" style="position:absolute;bottom:-3px;right:-3px;width:18px;height:18px;background:var(--brand-primary,#0b75fe);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid var(--bg-card);">
+													{#if uploading[candidate.id]}
+														<span style="width:8px;height:8px;border:1.5px solid rgba(255,255,255,0.4);border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;display:inline-block;"></span>
+													{:else}
+														<svg width="9" height="9" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><circle cx="12" cy="13" r="3"/></svg>
+													{/if}
+													<input type="file" accept="image/*" style="display:none;" onchange={(e) => handlePhotoUpload(candidate.id, e)} disabled={!!uploading[candidate.id]} />
+												</label>
+											{/if}
 										</div>
 										<div style="flex:1;min-width:0;">
-											<p
-												style="font-size:0.8125rem;font-weight:600;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
-												title={name}
-											>
+											<p style="font-size:0.8125rem;font-weight:600;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title={name}>
 												{name}
 											</p>
-											<p style="font-size:0.6875rem;color:var(--text-muted);margin-top:0.125rem;">
-												{partyName}
-											</p>
+											<p style="font-size:0.6875rem;color:var(--text-muted);margin-top:0.125rem;">{partyName}</p>
+											{#if candidate.photo_url && isModifiable()}
+												<button onclick={() => removePhoto(candidate.id)} style="font-size:0.6rem;font-weight:700;color:var(--status-danger-fg);background:none;border:none;cursor:pointer;padding:0;margin-top:2px;">Remove photo</button>
+											{/if}
 										</div>
+
 										{#if isModifiable()}
 											<button
 												onclick={() => handleDeleteCandidate(candidate.id)}

@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { authSession } from '$lib/stores/auth.js';
 	import { voterSession } from '$lib/stores/session.js';
+	import { branding } from '$lib/stores/branding.js';
 	import { page } from '$app/state';
 	import { toggleTheme } from '$lib/stores/theme.js';
 	import { fade } from 'svelte/transition';
@@ -41,6 +42,11 @@
 				name: 'Audit Logs',
 				path: '/admin/audit',
 				icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4'
+			},
+			{
+				name: 'App Settings',
+				path: '/admin/settings',
+				icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z'
 			}
 		],
 		adviser: [
@@ -93,15 +99,18 @@
 	};
 
 	function handleLogout() {
-		if (role === 'student') voterSession.logout();
-		else authSession.logout();
+		if (role === 'student') {
+			voterSession.logout();
+			goto('/student/validate');
+		} else {
+			authSession.logout();
+			goto('/login');
+		}
 		mobileMenuOpen = false;
-		goto('/');
 	}
 
-	function handleNav(/** @type {string} */ path) {
+	function handleNav() {
 		mobileMenuOpen = false;
-		goto(path);
 	}
 
 	const navItems = $derived(links[/** @type {keyof typeof links} */ (role)] || []);
@@ -132,33 +141,38 @@
 <!-- Sidebar -->
 <aside class="sidebar {collapsed ? 'collapsed' : 'expanded'} {mobileMenuOpen ? 'mobile-open' : ''}">
 	<!-- Brand / Logo (Top) -->
-	<div class="sidebar-brand" style="flex-direction: column; align-items: flex-start; gap: 1rem; height: auto;">
-		<div style="display:flex;align-items:center;gap:0.75rem;">
+	<div class="sidebar-brand" style="display: flex; flex-direction: column; align-items: flex-start; gap: 1rem; padding: 1.5rem 0.875rem 1rem; flex-shrink: 0; border-bottom: 2px solid rgba(0, 0, 0, 0.03); height: auto;">
+		<a href={role === 'student' ? '/student' : (role === 'adviser' ? '/adviser' : '/admin')} onclick={handleNav} style="display:flex;align-items:center;gap:0.75rem;text-decoration:none; width: 100%;">
 			<img
-				src="/Messenger_creation_1261776042047231.jpeg"
-				alt="UniVote Logo"
+				src={$branding.logoUrl || '/Messenger_creation_1261776042047231.jpeg'}
+				alt="{$branding.appName} Logo"
 				style="width: 32px; height: 32px; object-fit: contain; border-radius: 6px;"
 			/>
 			{#if !collapsed || mobileMenuOpen}
 				<span
 					style="font-size: 1.125rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em;"
-					>UniVote</span
+					>{$branding.appName}</span
 				>
 			{/if}
-		</div>
-		<div style="border-top: 1px solid var(--border-subtle); width: 100%;"></div>
+		</a>
+		<div style="border-top: 1px solid var(--border-subtle); width: 100%; margin-top: 1rem;"></div>
 		<div
 			class="flex items-center gap-3"
 			style="width: 100%;"
 		>
 			<button
 				onclick={toggleTheme}
-				class="user-avatar avatar-initial"
-				style="width: 32px; height: 32px; font-size: 0.75rem; flex-shrink: 0; cursor: pointer; transition: transform 0.2s;"
+				class="user-avatar"
+				class:avatar-initial={!student_info?.photo_url}
+				style="width: 32px; height: 32px; font-size: 0.75rem; flex-shrink: 0; cursor: pointer; transition: transform 0.2s; overflow: hidden; display: grid; place-items: center; padding: 0; border: {student_info?.photo_url ? '1px solid var(--border-main)' : 'none'};"
 				title="Toggle Dark Mode"
 				aria-label="Toggle Dark Mode"
 			>
-				{initials}
+				{#if student_info?.photo_url}
+					<img src={student_info.photo_url} alt={student_info.full_name} style="width: 100%; height: 100%; object-fit: cover;" />
+				{:else}
+					{initials}
+				{/if}
 			</button>
 			{#if !collapsed || mobileMenuOpen}
 				<div
@@ -211,8 +225,9 @@
 				{/if}
 			{:else if item.path}
 				{@const isActive = page.url.pathname === item.path.split('?')[0]}
-				<button
-					onclick={() => handleNav(item.path)}
+				<a
+					href={item.path}
+					onclick={handleNav}
 					class="nav-item {isActive ? 'active' : ''} {collapsed && !mobileMenuOpen
 						? 'icon-only'
 						: ''}"
@@ -237,7 +252,7 @@
 					{#if !collapsed || mobileMenuOpen}
 						<span class="nav-label">{item.name}</span>
 					{/if}
-				</button>
+				</a>
 			{/if}
 		{/each}
 	</nav>
@@ -294,11 +309,13 @@
 				>
 			{/if}
 		</button>
-		<img
-			src="/Messenger_creation_1261776042047231.jpeg"
-			alt="UniVote Logo"
-			style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;"
-		/>
+		<a href={role === 'student' ? '/student' : (role === 'adviser' ? '/adviser' : '/admin')} style="display:flex;align-items:center;gap:0.75rem;text-decoration:none;">
+			<img
+				src={$branding.logoUrl || '/Messenger_creation_1261776042047231.jpeg'}
+				alt="{$branding.appName} Logo"
+				style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;"
+			/>
+		</a>
 	</div>
 
 	<div style="display:flex;align-items:center;gap:0.5rem;">
@@ -319,12 +336,17 @@
 		</div>
 		<button
 			onclick={toggleTheme}
-			class="user-avatar avatar-initial"
-			style="width:32px;height:32px;font-size:0.75rem;cursor:pointer;"
+			class="user-avatar"
+			class:avatar-initial={!student_info?.photo_url}
+			style="width:32px;height:32px;font-size:0.75rem;cursor:pointer; overflow: hidden; display: grid; place-items: center; padding: 0; border: {student_info?.photo_url ? '1px solid var(--border-main)' : 'none'};"
 			title="Toggle Dark Mode"
 			aria-label="Toggle Dark Mode"
 		>
-			{initials}
+			{#if student_info?.photo_url}
+				<img src={student_info.photo_url} alt={student_info.full_name} style="width: 100%; height: 100%; object-fit: cover;" />
+			{:else}
+				{initials}
+			{/if}
 		</button>
 	</div>
 </div>
@@ -482,6 +504,7 @@
 		position: relative;
 		transition: all 0.2s;
 		width: 100%;
+		text-decoration: none;
 	}
 
 	.nav-item:hover {
@@ -490,7 +513,7 @@
 
 	/* Active state mimics the #E2E8F0 light blue rounded rec */
 	.nav-item.active {
-		color: #4318ff;
+		color: var(--brand-primary, #4318ff);
 		font-weight: 700;
 	}
 	:global(.dark) .nav-item.active {
@@ -500,12 +523,12 @@
 	.nav-bg {
 		position: absolute;
 		inset: 0;
-		background: #e9e3ff; /* Very soft indigo */
+		background: var(--brand-primary-light, #e9e3ff); /* Derived from primary color */
 		border-radius: 12px;
 		z-index: 0;
 	}
 	:global(.dark) .nav-bg {
-		background: rgba(67, 24, 255, 0.15);
+		background: var(--brand-primary-light, rgba(67, 24, 255, 0.15));
 	}
 
 	.nav-icon-wrap {

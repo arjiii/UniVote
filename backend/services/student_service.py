@@ -11,11 +11,8 @@ import string
 async def validate_student(student_id: str) -> dict:
     """Check that a student exists and return all active/completed elections with a secure access token."""
     available_elections = await election_service.get_available_elections()
-    if not available_elections:
-        raise HTTPException(
-            status_code=400,
-            detail="No active or completed elections currently available.",
-        )
+    # Logic note: we allow students to login even if no elections are active/completed, 
+    # so they can see upcoming ones or their results history.
 
     # Role guard: check if this ID belongs to an adviser or admin to prevent unauthorized access
     supabase = await get_async_supabase()
@@ -39,7 +36,7 @@ async def validate_student(student_id: str) -> dict:
 
     result = (
         await supabase.table("students")
-        .select("id, student_id, full_name, program, year_level")
+        .select("id, student_id, full_name, program, year_level, photo_url")
         .eq("student_id", student_id)
         .execute()
     )
@@ -121,10 +118,75 @@ def _generate_receipt_id(student_uuid: str, election_id: str) -> str:
 
 
 async def cast_votes(
-    student_id: str, election_id: str, votes: list, voting_pin: str
+    student_id: str,
+    election_id: str,
+    passcode_id: str,
+    adviser_id: str,
+    votes: list,
+    voting_pin: str,
+    session_passcode: str,
 ) -> dict:
     """Insert vote records via RPC and mark the student as voted. Returns receipt info."""
     supabase = await get_async_supabase()
+
+    # 0. VERIFY ELECTION STATUS (Security Layer 0)
+    # Ensure the election is actually "active" before allowing any votes.
+    elec_res = (
+        await supabase.table("elections")
+        .select("status")
+        .eq("id", election_id)
+        .execute()
+    )
+    if not elec_res.data:
+        raise HTTPException(status_code=404, detail="Election session not found.")
+    
+    status = elec_res.data[0]["status"]
+    if status != "active":
+        raise HTTPException(
+            status_code=403, 
+            detail=f"Voting is not permitted for this election. Current status: {status.upper()}"
+        )
+
+    # 1. VERIFY SESSION PASSCODE (Layer 2 - Adviser Passcode)
+    # Use the adviser_id to find the LATEST active record for this election.
+    # This allows the student to vote even if the record they used at entry (passcode_id)
+    # has been replaced by a fresher one (due to adviser rotation).
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc).isoformat()
+    passcode_check = await (
+        supabase.table("election_passcodes")
+        .select("id, passcode, expires_at")
+        .eq("election_id", str(election_id))
+        .eq("adviser_id", str(adviser_id))
+        .eq("is_active", True)
+        .execute()
+    )
+
+    if not passcode_check.data:
+        raise HTTPException(
+            status_code=403,
+            detail="Active session not found. Please re-enter with the current 6-digit Entry PIN.",
+        )
+
+    # Use the most recent active record
+    passcode_record = passcode_check.data[0]
+    
+    # Check if the provided session_passcode matches the latest record
+    if passcode_record["passcode"].upper() != session_passcode.strip().upper():
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid Adviser Session Passcode. Please ensure you are using the current 8-character code shown on your adviser's screen.",
+        )
+
+    # Check expiration (This applies to the 8-char passcode)
+    if passcode_record["expires_at"] < now:
+        raise HTTPException(
+            status_code=403,
+            detail="This Session Passcode has expired. Please ask your adviser to generate a new one.",
+        )
+
+    # 2. VERIFY STUDENT (Layer 3 - Identity & Student PIN)
     student_result = (
         await supabase.table("students")
         .select("id, voting_pin")
@@ -138,7 +200,7 @@ async def cast_votes(
     student_uuid = student_result.data[0]["id"]
     stored_pin = student_result.data[0].get("voting_pin")
 
-    # Verify PIN
+    # Verify Student PIN
     if not stored_pin or voting_pin != stored_pin:
         raise HTTPException(
             status_code=403,
@@ -157,7 +219,7 @@ async def cast_votes(
         ).execute()
 
         data = rpc_result.data
-        result_dict = {}
+        result_dict: dict = {}
         if isinstance(data, list) and len(data) > 0:
             result_dict = data[0]
         elif isinstance(data, dict):

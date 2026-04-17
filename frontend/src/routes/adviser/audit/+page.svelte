@@ -1,6 +1,8 @@
 <script>
 	import { onMount } from 'svelte';
 	import { adviser as adviserApi } from '$lib/api.js';
+	import { branding } from '$lib/stores/branding.js';
+	import { selectedElectionId } from '$lib/stores/election.js';
 	import { fly } from 'svelte/transition';
 
 	/** @type {any[]} */
@@ -47,7 +49,7 @@
 	}
 </script>
 
-<svelte:head><title>System Audit Logs | UniVote</title></svelte:head>
+<svelte:head><title>Audit Logs | {$branding.appName}</title></svelte:head>
 
 <div class="dash">
 	<div class="dash-header">

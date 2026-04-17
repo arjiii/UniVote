@@ -1,8 +1,9 @@
 <script>
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { student as studentApi } from '$lib/api.js';
 	import { voterSession } from '$lib/stores/session.js';
+	import { branding } from '$lib/stores/branding.js';
 	import { page } from '$app/state';
 	import { fade, fly, scale } from 'svelte/transition';
 	import { elasticOut } from 'svelte/easing';
@@ -10,7 +11,7 @@
 
 	let isSubmitting = $state(false);
 	let hasSubmitted = $state(false);
-	let isLoading = $state(true); // Always start true as we fetch specific election data
+	let isLoading = $state(true); 
 	let errorMessage = $state('');
 	let showConfirm = $state(false);
 	let alreadyVoted = $state(false);
@@ -18,10 +19,13 @@
 	let receiptId = $state('');
 
 	let isAuthorized = $state(false);
-	let adviserPasscode = $state('');
+	let adviserPin = $state(''); // Layer 1 Entry PIN
+	let passcodeId = $state(''); // Linked record ID
+	let adviserId = $state(''); // Adviser UID for persistent session tracking
 	let votingPin = $state('');
-	let showPin = $state(false);
 	let pinConfirmInput = $state('');
+	let sessionPasscode = $state(''); // Layer 2 Session Passcode
+	let showPin = $state(false);
 	let isVerifyingPasscode = $state(false);
 
 	/** @type {Record<string, any[]>} */
@@ -37,6 +41,16 @@
 	const selectedCount = $derived(Object.values(selectedVotes).filter((v) => v).length);
 	const totalPositions = $derived(positionOrder.length);
 	const allSelected = $derived(selectedCount === totalPositions && totalPositions > 0);
+	/** Tracks which positions are collapsed (after selecting a candidate) */
+	/** @type {Record<string, boolean>} */
+	let collapsed = $state({});
+
+	/** @param {string} position @param {string} candidateId */
+	function selectCandidate(position, candidateId) {
+		selectedVotes[position] = candidateId;
+		// Auto-collapse after selection (slight delay so user sees the selected state)
+		setTimeout(() => { collapsed[position] = true; }, 350);
+	}
 
 	/** @param {string} name */
 	function getMonogram(name) {
@@ -86,6 +100,12 @@
 		const electionInfo = (session.elections || []).find((e) => e.id === id);
 		electionName = electionInfo?.name || 'Election';
 
+		if (electionInfo?.status === 'upcoming') {
+			errorMessage = 'This election has not started yet. Please check back later.';
+			isLoading = false;
+			return;
+		}
+
 		if (electionInfo?.has_voted) {
 			alreadyVoted = true;
 			isLoading = false;
@@ -122,13 +142,15 @@
 			});
 	});
 
-	async function verifyAdviserCode() {
-		if (!adviserPasscode) return;
+	async function verifyPasscode() {
+		if (!adviserPin) return;
 		isVerifyingPasscode = true;
-		errorMessage = '';
 		try {
-			await studentApi.verifyPasscode(electionId, adviserPasscode);
+			const res = await studentApi.verifyPasscode(electionId, adviserPin);
+			passcodeId = res.passcode_id;
+			adviserId = res.adviser_id;
 			isAuthorized = true;
+			isLoading = false;
 		} catch (/** @type {any} */ err) {
 			errorMessage = err.message || 'Invalid Adviser Passcode.';
 		} finally {
@@ -155,10 +177,6 @@
 	async function submitVote() {
 		const session = $voterSession;
 		if (!session) return;
-		if (pinConfirmInput !== votingPin) {
-			errorMessage = 'Incorrect Voting PIN.';
-			return;
-		}
 
 		isSubmitting = true;
 		errorMessage = '';
@@ -170,7 +188,7 @@
 			}));
 
 		try {
-			const resp = await studentApi.vote(session.student_id ?? '', electionId, votes, votingPin);
+			const resp = await studentApi.vote(session.student_id ?? '', electionId, passcodeId, adviserId, votes, votingPin, sessionPasscode);
 			if (resp && resp.receipt_id) receiptId = resp.receipt_id;
 			voterSession.markVoted(electionId);
 			showConfirm = false;
@@ -183,12 +201,12 @@
 	}
 </script>
 
-<svelte:head><title>Voting Room | UniVote</title></svelte:head>
+<svelte:head><title>Cast Vote | {$branding.appName}</title></svelte:head>
 
 <div class="page-header">
 	<div class="breadcrumb-row">
 		<div class="live-dot"></div>
-		<span class="breadcrumb">OFFICIAL VOTING PORTAL</span>
+		<span class="breadcrumb">PAGES / VOTING BOOTH</span>
 	</div>
 	<h1 class="page-title">Voting Room</h1>
 </div>
@@ -197,6 +215,16 @@
 	<div class="loader-area" in:fade>
 		<div class="spinner"></div>
 		<p>Initializing secure protocol…</p>
+		<div style="display:flex;flex-direction:column;gap:2rem;width:100%;max-width:800px;margin-top:2rem;">
+			{#each [1, 2] as i}
+				<div class="skeleton" style="height:40px;width:200px;border-radius:8px;"></div>
+				<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;">
+					{#each [1, 2] as j}
+						<div class="skeleton" style="height:200px;border-radius:24px;opacity:0.3;"></div>
+					{/each}
+				</div>
+			{/each}
+		</div>
 	</div>
 {:else if hasSubmitted || alreadyVoted}
 	<div class="completed-wrapper" in:fade>
@@ -233,27 +261,48 @@
 			<div class="lock-icon">
 				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 			</div>
-			<h2 class="gk-title">Gatekeeper Required</h2>
-			<p class="gk-body">Enter the 16-digit Adviser Passcode to unlock this protected voting session.</p>
-			
+			<h2 class="gk-title">Voting Room Access</h2>
+			<p class="gk-body">Ask your room adviser for the <strong>6-digit Entry PIN</strong> to unlock and enter this voting session.</p>
+			<div class="gk-steps">
+				<div class="gk-step">
+					<span class="gk-step-num">1</span>
+					<span>Enter the 6-digit Entry PIN below to access the ballot</span>
+				</div>
+				<div class="gk-step">
+					<span class="gk-step-num">2</span>
+					<span>Select your candidates, then request the 8-character Session Code from your adviser to finalize your vote</span>
+				</div>
+			</div>
+
 			<div class="gk-form">
-				<input 
-					type="text" 
-					bind:value={adviserPasscode} 
-					placeholder="XXXX-XXXX-XXXX-XXXX"
+				<label class="gk-pin-label" for="entry-pin-input">Entry PIN</label>
+				<input
+					id="entry-pin-input"
+					type="password"
+					inputmode="numeric"
+					bind:value={adviserPin}
+					placeholder="••••••"
+					maxlength="6"
 					class="passcode-input"
+					onkeydown={(e) => e.key === 'Enter' && adviserPin.length === 6 && verifyPasscode()}
 				>
 				{#if errorMessage}
 					<p class="err-msg">{errorMessage}</p>
 				{/if}
-				<button class="btn btn-primary w-full" disabled={isVerifyingPasscode} onclick={verifyAdviserCode}>
+				<button
+					class="btn-primary"
+					disabled={isVerifyingPasscode || adviserPin.length < 6 || (voterSession.getElectionStatus && voterSession.getElectionStatus(electionId) === 'upcoming')}
+					onclick={verifyPasscode}
+				>
 					{#if isVerifyingPasscode}
-						Authorizing…
+						Verifying…
+					{:else if voterSession.getElectionStatus && voterSession.getElectionStatus(electionId) === 'upcoming'}
+						Voting Not Started
 					{:else}
-						Open Ballot Portal
+						Enter Voting Room
 					{/if}
 				</button>
-				<a href="/student" class="gk-abort">Return to Dashboard</a>
+				<a href="/student" class="gk-abort">← Return to Dashboard</a>
 			</div>
 		</div>
 	</div>
@@ -277,32 +326,68 @@
 
 		<div class="positions-stack">
 			{#each positionOrder as position, idx}
+				{@const isCollapsed = collapsed[position] && !!selectedVotes[position]}
+				{@const selectedCand = (candidatesGrouped[position] || []).find(c => c.id === selectedVotes[position])}
 				<div class="position-section" in:fly={{ y: 20, delay: idx * 100 }}>
-					<div class="pos-header">
+					<!-- Position header (always visible) -->
+					<div class="pos-header" role="button" tabindex="0" style="cursor:{selectedVotes[position] ? 'pointer' : 'default'}" onclick={() => { if (selectedVotes[position]) collapsed[position] = !collapsed[position]; }} onkeydown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && selectedVotes[position]) collapsed[position] = !collapsed[position]; }}>
 						<div class="pos-num" class:done={selectedVotes[position]}>{idx + 1}</div>
 						<div class="pos-text">
 							<h3 class="pos-title">{position}</h3>
-							<p class="pos-meta">{selectedVotes[position] ? 'Selection Recorded' : 'Select Candidate'}</p>
+							<p class="pos-meta">{selectedVotes[position] ? 'Selection Recorded ▾ click to change' : 'Select Candidate'}</p>
 						</div>
+						<!-- Collapsed summary row -->
+						{#if isCollapsed && selectedCand}
+							<div style="display:flex;align-items:center;gap:10px;margin-left:auto;" in:fade>
+								{#if selectedCand.id}
+									{@const photoUrl = studentApi.getCandidatePhotoUrl ? studentApi.getCandidatePhotoUrl(selectedCand.id) : `/api/common/candidates/${selectedCand.id}/photo`}
+									<img src={photoUrl} alt={selectedCand.name} style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid var(--green);" />
+								{:else}
+									<div class="cand-avatar" style="width:32px;height:32px;font-size:11px;background:var(--accent);color:white;">{getMonogram(selectedCand.name)}</div>
+								{/if}
+								<span style="font-size:13px;font-weight:700;color:var(--green);">{selectedCand.name}</span>
+								<button onclick={(e) => { e.stopPropagation(); collapsed[position] = false; }} style="font-size:11px;font-weight:700;color:var(--accent);background:none;border:none;cursor:pointer;">Change</button>
+							</div>
+						{/if}
 					</div>
 
-					<div class="candidates-grid">
-						{#each candidatesGrouped[position] as cand}
-							<button 
-								class="cand-card" 
-								class:active={selectedVotes[position] === cand.id}
-								onclick={() => selectedVotes[position] = cand.id}
-							>
-								<div class="cand-avatar">{getMonogram(cand.name)}</div>
-								<div class="cand-name">{cand.name}</div>
-								<div class="cand-party">{cand.party}</div>
-								<div class="cand-check">
-									<div class="check-dot"></div>
-									<span>{selectedVotes[position] === cand.id ? 'SELECTED' : 'CHOOSE'}</span>
-								</div>
-							</button>
-						{/each}
-					</div>
+					<!-- Candidates grid (collapsible) -->
+					{#if !isCollapsed}
+						<div class="candidates-grid" in:fly={{ y: -8, duration: 250 }}>
+							{#each candidatesGrouped[position] as cand}
+								<button
+									class="cand-card"
+									class:active={selectedVotes[position] === cand.id}
+									onclick={() => selectCandidate(position, cand.id)}
+								>
+									{#if cand.id}
+										{@const photoUrl = studentApi.getCandidatePhotoUrl ? studentApi.getCandidatePhotoUrl(cand.id) : `/api/common/candidates/${cand.id}/photo`}
+										<img 
+											src={photoUrl} 
+											alt={cand.name} 
+											class="cand-photo" 
+											loading="lazy"
+											onerror={(e) => { 
+												const target = /** @type {HTMLImageElement} */ (e.currentTarget);
+												const next = /** @type {HTMLElement} */ (target.nextElementSibling);
+												target.style.display = 'none'; 
+												if (next) next.style.display = 'flex'; 
+											}}
+										/>
+										<div class="cand-avatar" style="display:none;">{getMonogram(cand.name)}</div>
+									{:else}
+										<div class="cand-avatar">{getMonogram(cand.name)}</div>
+									{/if}
+									<div class="cand-name">{cand.name}</div>
+									<div class="cand-party">{cand.party}</div>
+									<div class="cand-check">
+										<div class="check-dot"></div>
+										<span>{selectedVotes[position] === cand.id ? 'SELECTED' : 'CHOOSE'}</span>
+									</div>
+								</button>
+							{/each}
+						</div>
+					{/if}
 				</div>
 			{/each}
 		</div>
@@ -312,11 +397,63 @@
 				<h3 class="f-title">{allSelected ? 'Protocol Complete' : 'Protocol Pending'}</h3>
 				<p class="f-body">{allSelected ? 'Ballot ready for final encryption.' : `Designate candidates for all ${totalPositions} positions.`}</p>
 			</div>
-			<button class="btn btn-primary lg" disabled={!allSelected} onclick={() => showConfirm = true}>
+			<button class="btn btn-primary lg" disabled={!allSelected} onclick={async () => { await fetchPin(); showConfirm = true; }}>
 				Certify Ballot
 			</button>
 		</div>
 	</div>
+
+	<!-- Confirmation Modal -->
+	{#if showConfirm}
+		<div 
+			class="modal-overlay" 
+			in:fade 
+			role="button"
+			tabindex="-1"
+			onclick={() => showConfirm = false}
+			onkeydown={e => e.key === 'Escape' && (showConfirm = false)}
+		>
+			<div class="modal-card" role="dialog" aria-modal="true" tabindex="-1" onclick={e => e.stopPropagation()} onkeydown={e => e.stopPropagation()} in:scale={{ start: 0.9 }}>
+				<h3 class="modal-title">Confirm Ballot</h3>
+				<p class="modal-subtitle">Your vote is anonymous and final. Secure encryption is about to engage.</p>
+				
+				<div class="review-box">
+					{#each getReviewList() as item}
+						<div class="review-item">
+							<span class="r-pos">{item.position}</span>
+							<span class="r-name">{item.candidate.name}</span>
+						</div>
+					{/each}
+				</div>
+
+				<div class="pin-section">
+					<div class="pin-header">
+						<span class="p-label">Step 1: Verify Your Unique Voting PIN</span>
+					</div>
+					<div class="pin-reveal" in:fade>
+						<span class="pr-label">Your Secure PIN</span>
+						<span class="pr-val">{votingPin || '••••••'}</span>
+					</div>
+					<p style="font-size:11px;color:var(--muted);margin-bottom:12px;">This unique PIN is required to sign your ballot. We've fetched it for you to ensure a smooth voting experience.</p>
+				</div>
+
+				<div class="pin-section" style="margin-top:20px;border-top:1px dashed var(--border);padding-top:20px;">
+					<div class="pin-header">
+						<span class="p-label">Step 2: 🎲 Adviser Session Code</span>
+					</div>
+					<p style="font-size:11px;color:var(--muted);margin-bottom:12px;">Ask your room monitoring adviser for their <strong>8-character Session Code</strong>. This code is tied to the same adviser whose Entry PIN you used.</p>
+					<input type="text" maxlength="8" bind:value={sessionPasscode} placeholder="e.g. 1234567G" class="pin-input" style="text-transform:uppercase;letter-spacing:0.2em;font-family:monospace;">
+				</div>
+
+				<div class="modal-buttons">
+					<button class="btn btn-ghost flex-1" onclick={() => showConfirm = false}>Cancel</button>
+					<button class="btn btn-primary flex-1" disabled={isSubmitting || !votingPin || sessionPasscode.length < 8} onclick={submitVote}>
+						{isSubmitting ? 'Casting…' : 'Cast Vote'}
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 {:else}
 	<!-- Election Selection (Rare if coming from home, but fallback) -->
 	{#if Array.isArray($voterSession?.elections)}
@@ -347,55 +484,6 @@
 			</div>
 		{/if}
 	{/if}
-{/if}
-
-<!-- Confirmation Modal -->
-{#if showConfirm}
-	<div 
-		class="modal-overlay" 
-		in:fade 
-		role="button"
-		tabindex="-1"
-		onclick={() => showConfirm = false}
-		onkeydown={e => e.key === 'Escape' && (showConfirm = false)}
-	>
-		<div class="modal-card" role="dialog" aria-modal="true" tabindex="-1" onclick={e => e.stopPropagation()} onkeydown={e => e.stopPropagation()} in:scale={{ start: 0.9 }}>
-			<h3 class="modal-title">Confirm Ballot</h3>
-			<p class="modal-subtitle">Your vote is anonymous and final. Secure encryption is about to engage.</p>
-			
-			<div class="review-box">
-				{#each getReviewList() as item}
-					<div class="review-item">
-						<span class="r-pos">{item.position}</span>
-						<span class="r-name">{item.candidate.name}</span>
-					</div>
-				{/each}
-			</div>
-
-			<div class="pin-section">
-				<div class="pin-header">
-					<span class="p-label">Enter Voting PIN</span>
-					{#if !showPin}
-						<button class="p-get" onclick={fetchPin}>Show My PIN</button>
-					{/if}
-				</div>
-				{#if showPin}
-					<div class="pin-reveal" in:fade>
-						<span class="pr-label">Unique PIN</span>
-						<span class="pr-val">{votingPin}</span>
-					</div>
-				{/if}
-				<input type="text" maxlength="6" bind:value={pinConfirmInput} placeholder="XXXXXX" class="pin-input">
-			</div>
-
-			<div class="modal-buttons">
-				<button class="btn btn-ghost flex-1" onclick={() => showConfirm = false}>Cancel</button>
-				<button class="btn btn-primary flex-1" disabled={isSubmitting || pinConfirmInput.length < 6} onclick={submitVote}>
-					{isSubmitting ? 'Casting…' : 'Cast Vote'}
-				</button>
-			</div>
-		</div>
-	</div>
 {/if}
 
 <style>
@@ -450,6 +538,10 @@
 	.gk-abort { display: block; margin-top: 16px; font-size: 12px; font-weight: 700; color: var(--muted); text-decoration: none; text-transform: uppercase; letter-spacing: 1px; }
 	.gk-abort:hover { color: var(--text); }
 	.err-msg { color: var(--red); font-size: 12px; font-weight: 700; margin-bottom: 16px; }
+	.gk-steps { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; text-align: left; }
+	.gk-step { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+	.gk-step-num { min-width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: white; font-size: 11px; font-weight: 800; display: grid; place-items: center; flex-shrink: 0; margin-top: 1px; }
+	.gk-pin-label { display: block; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; text-align: left; }
 
 	/* BALLOT */
 	.ballot-container { width: 100%; max-width: 1800px; padding-bottom: 60px; }
@@ -474,6 +566,8 @@
 	.cand-card:hover { transform: translateY(-3px); border-color: var(--accent); }
 	.cand-card.active { border-color: var(--green); background: var(--green-bg); border-width: 2px; }
 	.cand-avatar { width: 60px; height: 60px; border-radius: 50%; background: var(--surface2); color: var(--muted); font-size: 18px; font-weight: 800; display: grid; place-items: center; margin: 0 auto 16px; transition: all 0.2s; }
+	.cand-photo { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin: 0 auto 16px; display: block; border: 2px solid var(--border); transition: all 0.2s; }
+	.cand-card.active .cand-photo { border-color: var(--green); box-shadow: 0 0 0 3px rgba(16,185,129,0.2); }
 	.cand-card.active .cand-avatar { background: var(--accent); color: white; }
 	.cand-name { font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
 	.cand-party { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 24px; }
@@ -500,7 +594,6 @@
 	.pin-section { margin-bottom: 28px; }
 	.pin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 	.p-label { font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
-	.p-get { font-size: 10px; font-weight: 800; color: var(--accent); border: none; background: transparent; cursor: pointer; }
 	.pin-reveal { background: var(--green-bg); border: 1px solid rgba(18,183,106,0.3); border-radius: 12px; padding: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
 	.pr-label { font-size: 9px; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: 1px; }
 	.pr-val { font-family: monospace; font-size: 18px; font-weight: 800; color: var(--green); letter-spacing: 4px; }

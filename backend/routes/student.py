@@ -3,6 +3,8 @@ from models import StudentAuth, VoteSubmit, PasscodeVerify
 from services import student_service, adviser_service, audit_service
 from deps import CurrentStudent, StudentUser
 from limiter import limiter
+from database import get_async_supabase
+from datetime import datetime, timezone
 
 router = APIRouter()
 
@@ -48,8 +50,10 @@ async def cast_vote(
     result = await student_service.cast_votes(
         student_id=vote_submit.student_id,
         election_id=vote_submit.election_id,
+        passcode_id=vote_submit.passcode_id,
         votes=votes_payload,
         voting_pin=vote_submit.voting_pin,
+        session_passcode=vote_submit.session_passcode,
     )
     # Log voting event
     await audit_service.log_action(
@@ -74,6 +78,58 @@ async def get_candidates(election_id: str, student: StudentUser = CurrentStudent
     return {"data": await adviser_service.get_candidates(election_id)}
 
 
+@router.put("/profile-photo")
+async def upload_student_photo(
+    request: Request,
+    body: dict,
+    student: StudentUser = CurrentStudent,
+):
+    """Student uploads their own profile photo (base64 data URL)."""
+    photo_url = body.get("photo_url", "")
+    if not photo_url:
+        raise HTTPException(status_code=400, detail="photo_url is required.")
+    if len(photo_url) > 7_000_000:
+        raise HTTPException(status_code=400, detail="Image too large (max ~5MB).")
+    supabase = await get_async_supabase()
+    res = (
+        await supabase.table("students")
+        .update({"photo_url": photo_url})
+        .eq("student_id", student.student_id)
+        .execute()
+    )
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Student not found.")
+    
+    # Log student photo upload
+    await audit_service.log_action(
+        actor_id=student.student_id,
+        actor_role="student",
+        action="UPLOAD_PROFILE_PHOTO",
+        target_type="student",
+        target_id=student.student_id,
+        details={"photo_url": f"base64_data[{len(photo_url)}]"},
+        request=request,
+    )
+    
+    return {"message": "Photo updated.", "photo_url": photo_url}
+
+
+@router.get("/profile-photo")
+async def get_student_photo(student: StudentUser = CurrentStudent):
+    """Retrieve the student's current profile photo."""
+    supabase = await get_async_supabase()
+    res = (
+        await supabase.table("students")
+        .select("photo_url")
+        .eq("student_id", student.student_id)
+        .single()
+        .execute()
+    )
+    photo_url = res.data.get("photo_url") if res.data else None
+    return {"photo_url": photo_url}
+
+
+
 @router.get("/vote-summary")
 async def get_vote_summary(
     student_id: str, election_id: str, student: StudentUser = CurrentStudent
@@ -96,33 +152,28 @@ async def get_results(election_id: str):
 async def verify_passcode(
     payload: PasscodeVerify, student: StudentUser = CurrentStudent
 ):
-    supabase = await student_service.get_async_supabase()
-    from datetime import datetime, timezone
-
-    now = datetime.now(timezone.utc).isoformat()
+    supabase = await get_async_supabase()
 
     # First check if it exists and is active for this election
+    # The Entry PIN itself does not expire (only the 8-char session passcode does)
     res = await (
         supabase.table("election_passcodes")
-        .select("id, expires_at")
+        .select("id, adviser_id")
         .eq("election_id", str(payload.election_id))
-        .eq("passcode", payload.passcode.strip().upper())
+        .eq("entry_pin", payload.passcode.strip())
         .eq("is_active", True)
         .execute()
     )
 
     if not res.data:
-        raise HTTPException(status_code=403, detail="Invalid Adviser Passcode.")
+        raise HTTPException(status_code=403, detail="Invalid Entry PIN. Please check with your adviser.")
 
-    # Then check if it has expired
-    passcode_record = res.data[0]
-    if passcode_record["expires_at"] < now:
-        raise HTTPException(
-            status_code=403,
-            detail="This Passcode has expired. Please request a new one from your adviser.",
-        )
-
-    return {"message": "Passcode verified"}
+    record = res.data[0]
+    return {
+        "message": "Passcode verified.", 
+        "passcode_id": record["id"], 
+        "adviser_id": record["adviser_id"]
+    }
 
 
 @router.get("/voting-pin")

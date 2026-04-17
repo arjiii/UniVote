@@ -185,10 +185,11 @@ body {
 	font-family: 'Geist Mono', monospace;
 	font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 	background-color: var(--bg-main);
-	background-image:
-		radial-gradient(ellipse at 15% 0%, rgba(124, 58, 237, 0.12) 0%, transparent 55%),
-		radial-gradient(ellipse at 85% 5%, rgba(80, 70, 229, 0.1) 0%, transparent 50%),
-		radial-gradient(ellipse at 80% 95%, rgba(245, 158, 11, 0.08) 0%, transparent 50%);
+	/* Premium subtle voting-themed pattern */
+	background-image: 
+		radial-gradient(circle at 2px 2px, var(--border-main) 1px, transparent 0),
+		url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 10h12v12H10V10zm2 2v8h8V12h-8zm1 2h6v1h-6v-1zM70 60h12v12H70V60zm2 2v8h8V62h-8zm1 2h6v1h-6v-1z' fill='%23000' fill-opacity='0.02'/%3E%3C/svg%3E");
+	background-size: 32px 32px, 120px 120px;
 	background-attachment: fixed;
 	color: var(--text-main);
 	line-height: 1.5;
@@ -196,7 +197,9 @@ body {
 	-moz-osx-font-smoothing: grayscale;
 }
 .dark body {
-	background-image: none;
+	background-image: 
+		radial-gradient(circle at 2px 2px, rgba(255,255,255,0.03) 1px, transparent 0);
+	background-size: 32px 32px;
 }
 
 /* ============================================================
@@ -1105,3 +1108,29 @@ hr,
 	border-bottom: 1px solid var(--border-main);
 	background: var(--bg-elevated);
 }
+
+/* ============================================================
+   DECORATIVE FLOATING ICONS
+   ============================================================ */
+
+.floating-icon {
+	position: absolute;
+	pointer-events: none;
+	z-index: 0;
+	color: var(--brand-primary);
+	opacity: 0.12;
+	filter: blur(1.5px);
+	animation: float-buoyant 20s infinite ease-in-out;
+}
+
+@keyframes float-buoyant {
+	0%, 100% { transform: translate(0, 0) rotate(0deg); }
+	33% { transform: translate(30px, -45px) rotate(8deg); }
+	66% { transform: translate(-25px, 20px) rotate(-6deg); }
+}
+
+.floating-icon-xl { width: 240px; height: 240px; }
+.floating-icon-lg { width: 180px; height: 180px; }
+.floating-icon-md { width: 120px; height: 120px; }
+.floating-icon-sm { width: 60px; height: 60px; }
+.floating-icon-xs { width: 30px; height: 30px; }

@@ -61,8 +61,11 @@ class VoteItem(BaseModel):
 class VoteSubmit(BaseModel):
     student_id: str
     election_id: UUID
+    passcode_id: UUID  # Original record ID used at entry
+    adviser_id: UUID  # The adviser UID derived during entrance
     votes: List[VoteItem]
     voting_pin: str
+    session_passcode: str  # The 8-char alphanumeric passcode from advisor
 
 
 class PasscodeVerify(BaseModel):
@@ -81,6 +84,7 @@ class StudentUpdate(BaseModel):
 
 
 class AdviserCreate(BaseModel):
+    id_number: str
     email: str
     password: str
     full_name: str
@@ -93,3 +97,27 @@ class RegisterRequest(BaseModel):
     full_name: str
     role: str  # 'admin' or 'adviser'
     department: Optional[str] = None
+
+
+class AppSettingsUpdate(BaseModel):
+    app_name: Optional[str] = None
+    primary_color: Optional[str] = None
+    accent_color: Optional[str] = None
+    logo_url: Optional[str] = None
+
+
+class AdviserImportRow(BaseModel):
+    full_name: str
+    email: str
+    department: Optional[str] = None
+
+
+class AdviserChangePassword(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class AdviserSetEntryPin(BaseModel):
+    election_id: str
+    pin: str  # exactly 6 digits
+

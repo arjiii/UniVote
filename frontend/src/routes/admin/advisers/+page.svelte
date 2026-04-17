@@ -1,17 +1,36 @@
 <script>
 	import { onMount } from 'svelte';
 	import { admin as adminApi } from '$lib/api.js';
+	import { branding } from '$lib/stores/branding.js';
 	import Notification from '$lib/components/Notification.svelte';
+	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
 
 	/** @type {Array<any>} */
 	let advisers = $state([]);
 	let isLoading = $state(true);
-	let newAdviser = $state({ full_name: '', email: '', password: '', department: '' });
+	let adviserSearch = $state('');
+	let newAdviser = $state({ full_name: '', email: '', id_number: '', password: '', department: '' });
 	let isAdding = $state(false);
 	let showForm = $state(false);
+	let showImport = $state(false);
+	let isImporting = $state(false);
+	/** @type {Array<{full_name:string,email:string,employee_id:string,default_password:string}>} */
+	let importResults = $state([]);
+	/** @type {Array<any>} */
+	let importSkipped = $state([]);
+
 	let pageHistory = $state([/** @type {string | null} */ (null)]);
 	let currentPage = $state(0);
 	let nextPageToken = $state(/** @type {string | null} */ (null));
+
+	// Confirmation Modal State
+	let confirmState = $state({
+		show: false,
+		title: '',
+		message: '',
+		onConfirm: () => {},
+		id: ''
+	});
 
 	/** @type {{ text: string, type: 'info' | 'success' | 'error' }} */
 	let notification = $state({ text: '', type: 'info' });
@@ -48,6 +67,17 @@
 		await loadAdvisers(prevToken);
 	}
 
+	const filteredAdvisers = $derived(
+		adviserSearch
+			? advisers.filter(
+					(a) =>
+						a.full_name.toLowerCase().includes(adviserSearch.toLowerCase()) ||
+						a.email.toLowerCase().includes(adviserSearch.toLowerCase()) ||
+						a.id_number?.toLowerCase().includes(adviserSearch.toLowerCase())
+				)
+			: advisers
+	);
+
 	function notify(text = '', type = /** @type {'info' | 'success' | 'error'} */ ('info')) {
 		notification = { text, type };
 		setTimeout(() => (notification = { text: '', type: 'info' }), 3500);
@@ -61,8 +91,8 @@
 		}
 		isAdding = true;
 		try {
-			await adminApi.createAdviser(newAdviser);
-			newAdviser = { email: '', password: '', full_name: '', department: '' };
+			const res = await adminApi.createAdviser(newAdviser);
+			newAdviser = { email: '', id_number: '', password: '', full_name: '', department: '' };
 			showForm = false;
 			notify('Adviser account created', 'success');
 			await loadAdvisers();
@@ -73,19 +103,54 @@
 		}
 	}
 
-	async function deleteAdviser(/** @type {string} */ id) {
-		if (!confirm('Delete this adviser account?')) return;
+	function promptDelete(/** @type {any} */ adviser) {
+		confirmState = {
+			show: true,
+			title: 'Revoke Access',
+			message: `Are you sure you want to delete the adviser account for ${adviser.full_name}? This action cannot be undone.`,
+			id: adviser.id,
+			onConfirm: async () => {
+				try {
+					await adminApi.deleteAdviser(confirmState.id);
+					advisers = advisers.filter((a) => a.id !== confirmState.id);
+					notify('Adviser account removed', 'success');
+				} catch (/** @type {any} */ err) {
+					notify(err.message ?? 'Failed to delete adviser', 'error');
+				} finally {
+					confirmState.show = false;
+				}
+			}
+		};
+	}
+	async function handleImport(/** @type {Event} */ e) {
+		const input = /** @type {HTMLInputElement} */ (e.target);
+		const file = input.files?.[0];
+		if (!file) return;
+		isImporting = true;
+		importResults = [];
+		importSkipped = [];
 		try {
-			await adminApi.deleteAdviser(id);
-			advisers = advisers.filter((a) => a.id !== id);
-			notify('Adviser account removed', 'success');
+			const fd = new FormData();
+			fd.append('file', file);
+			const res = await adminApi.importAdvisers(fd);
+			importResults = res.created ?? [];
+			importSkipped = res.skipped ?? [];
+			notify(res.message ?? 'Import complete', importResults.length > 0 ? 'success' : 'info');
+			await loadAdvisers();
 		} catch (/** @type {any} */ err) {
-			notify(err.message ?? 'Failed to delete adviser', 'error');
+			notify(err.message ?? 'Import failed', 'error');
+		} finally {
+			isImporting = false;
+			input.value = '';
 		}
+	}
+
+	function copyToClipboard(/** @type {string} */ text) {
+		navigator.clipboard?.writeText(text).then(() => notify('Copied!', 'success'));
 	}
 </script>
 
-<svelte:head><title>Advisers | UniVote Admin</title></svelte:head>
+<svelte:head><title>Advisers | {$branding.appName}</title></svelte:head>
 
 <div class="dash">
 	<div class="dash-header">
@@ -94,6 +159,27 @@
 			<h1 class="dash-title">Adviser Registry</h1>
 		</div>
 		<div style="display:flex;gap:0.5rem;align-items:center;">
+			<!-- Search -->
+			<div style="position:relative;">
+				<svg
+					style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);width:0.875rem;height:0.875rem;color:var(--text-subtle);opacity:0.6;"
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+					><path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2.5"
+						d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+					/></svg
+				>
+				<input
+					bind:value={adviserSearch}
+					placeholder="Search advisers…"
+					class="input-base"
+					style="padding-left:2.5rem;width:240px;height:2rem;font-size:0.75rem;font-family:sans-serif;"
+				/>
+			</div>
 			<button onclick={() => loadAdvisers()} class="btn-secondary btn-sm">
 				<svg
 					class="h-3.5 w-3.5"
@@ -109,7 +195,13 @@
 				>
 				Refresh
 			</button>
-			<button onclick={() => (showForm = !showForm)} class="btn-primary btn-sm">
+			<button onclick={() => { showImport = !showImport; showForm = false; }} class="btn-secondary btn-sm">
+				<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+					><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg
+				>
+				Import CSV
+			</button>
+			<button onclick={() => { showForm = !showForm; showImport = false; }} class="btn-primary btn-sm">
 				<svg
 					class="h-3.5 w-3.5"
 					fill="none"
@@ -122,6 +214,98 @@
 			</button>
 		</div>
 	</div>
+
+	<!-- Import Panel -->
+	{#if showImport}
+		<div class="admin-card" style="padding:1.25rem;">
+			<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+				<h2 style="font-size:0.875rem;font-weight:600;color:var(--text-main);">Bulk Import Advisers via CSV</h2>
+				<button onclick={() => (showImport = false)} class="btn-icon" aria-label="Close"><svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+			</div>
+
+			<div style="display:flex;flex-direction:column;gap:0.75rem;">
+				<p style="font-size:0.8125rem;color:var(--text-subtle);">
+					Upload a CSV file with columns: <code style="background:var(--bg-elevated);padding:1px 5px;border-radius:4px;">full_name, email, employee_id, department</code>.
+					<strong>employee_id</strong> is required and becomes the login ID. Each adviser must change their password on first login.
+				</p>
+				<div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+					<label class="btn-primary btn-sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;">
+						{#if isImporting}
+							<span style="width:12px;height:12px;border:2px solid rgba(0,0,0,0.2);border-top-color:#0f172a;border-radius:50%;animation:spin 0.7s linear infinite;display:inline-block;"></span>
+							Importing…
+						{:else}
+							<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+							Choose CSV File
+						{/if}
+						<input type="file" accept=".csv,text/csv" style="display:none;" onchange={handleImport} disabled={isImporting} />
+					</label>
+					<a
+						href={adminApi.downloadAdviserTemplate()}
+						download="advisers_template.csv"
+						class="btn-secondary btn-sm"
+						style="display:inline-flex;align-items:center;gap:0.4rem;text-decoration:none;"
+					>
+						<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5 0l-4.5 4.5m0 0L12 16.5m-1.5 4.5V3"/></svg>
+						Download Template
+					</a>
+				</div>
+
+				<!-- Import results -->
+				{#if importResults.length > 0}
+					<div style="margin-top:0.75rem;">
+						<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+							<p style="font-size:0.75rem;font-weight:700;color:var(--text-main);">
+								✅ {importResults.length} adviser(s) created — share these credentials:
+							</p>
+							<button 
+								class="btn-primary btn-sm" 
+								style="font-size:0.6875rem;"
+								onclick={() => {
+									const list = importResults.map(r => `Full Name: ${r.full_name}\nID: ${r.employee_id}\nPassword: ${r.default_password}`).join('\n\n---\n\n');
+									copyToClipboard(list);
+									notify('All credentials copied to clipboard!', 'success');
+								}}
+							>
+								Copy All Credentials
+							</button>
+						</div>
+						<div style="overflow-x:auto;max-height:300px;border:1px solid var(--border-subtle);border-radius:12px;">
+							<table class="data-table" style="font-size:0.75rem;">
+								<thead>
+									<tr>
+										<th>Full Name</th>
+										<th>Employee ID (Login)</th>
+										<th>Temporary Password</th>
+										<th></th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each importResults as r}
+										<tr>
+											<td style="font-weight:600;">{r.full_name}</td>
+											<td><code style="background:var(--bg-elevated);padding:1px 5px;border-radius:4px;">{r.employee_id}</code></td>
+											<td><code style="background:var(--bg-elevated);padding:1px 5px;border-radius:4px;">{r.default_password}</code></td>
+											<td style="text-align:right;">
+												<button
+													class="btn-secondary btn-sm"
+													style="padding:0.2rem 0.5rem;font-size:0.6875rem;"
+													onclick={() => copyToClipboard(`Employee ID: ${r.employee_id}\nPassword: ${r.default_password}`)}
+												>Copy</button>
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+						<p style="font-size:0.6875rem;color:var(--text-subtle);margin-top:0.5rem;">⚠️ Save these credentials now — passwords are not stored in plaintext.</p>
+					</div>
+				{/if}
+				{#if importSkipped.length > 0}
+					<p style="font-size:0.75rem;color:var(--status-warning-fg,#d97706);margin-top:0.25rem;">⚠️ {importSkipped.length} row(s) skipped (duplicate email or missing fields).</p>
+				{/if}
+			</div>
+		</div>
+	{/if}
 
 	<!-- Add Adviser Form -->
 	{#if showForm}
@@ -154,13 +338,22 @@
 					/>
 				</div>
 				<div>
-					<label class="field-label" for="adviser_email">Email Address *</label>
+					<label class="field-label" for="adviser_email">Email *</label>
 					<input
 						id="adviser_email"
 						type="email"
 						class="input-base"
 						bind:value={newAdviser.email}
-						placeholder="jane.doe@univote.edu"
+						placeholder="e.g. jane@school.edu"
+					/>
+				</div>
+				<div>
+					<label class="field-label" for="employee_id">Employee ID *</label>
+					<input
+						id="employee_id"
+						class="input-base"
+						bind:value={newAdviser.id_number}
+						placeholder="e.g. EMP-2024-001"
 					/>
 				</div>
 				<div>
@@ -200,7 +393,7 @@
 	<div class="admin-card" style="overflow:hidden;">
 		<div style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-main);">
 			<p class="section-label">
-				Listing active adviser accounts
+				Listing {filteredAdvisers.length} active adviser account{filteredAdvisers.length !== 1 ? 's' : ''}
 			</p>
 		</div>
 
@@ -210,8 +403,10 @@
 					<div class="skeleton" style="height:3rem;"></div>
 				{/each}
 			</div>
-		{:else if advisers.length === 0}
-			<div class="empty-state">No advisers registered. Click "Add Adviser" to create one.</div>
+		{:else if filteredAdvisers.length === 0}
+			<div class="empty-state">
+				{adviserSearch ? 'No advisers match your search.' : 'No advisers registered. Click "Add Adviser" to create one.'}
+			</div>
 		{:else}
 			<div style="overflow-x:auto;">
 				<table class="data-table">
@@ -219,13 +414,13 @@
 						<tr>
 							<th style="width:1%;">Avatar</th>
 							<th>Full Name</th>
-							<th>Email</th>
+							<th>Employee ID</th>
 							<th>Department</th>
 							<th style="text-align:right;">Actions</th>
 						</tr>
 					</thead>
 					<tbody>
-						{#each advisers as adviser (adviser.id)}
+						{#each filteredAdvisers as adviser (adviser.id)}
 							<tr>
 								<td>
 									<div class="avatar-initial" style="width:32px;height:32px;">
@@ -233,7 +428,7 @@
 									</div>
 								</td>
 								<td style="font-weight:600;color:var(--text-main);">{adviser.full_name}</td>
-								<td style="color:var(--text-muted);">{adviser.email}</td>
+								<td style="color:var(--text-muted);">{adviser.id_number}</td>
 								<td>
 									{#if adviser.department}
 										<span class="pill pill-neutral">{adviser.department}</span>
@@ -243,7 +438,7 @@
 								</td>
 								<td style="text-align:right;">
 									<button
-										onclick={() => deleteAdviser(adviser.id)}
+										onclick={() => promptDelete(adviser)}
 										class="btn-icon-danger"
 										title="Revoke access"
 									>
@@ -287,3 +482,11 @@
 <div style="position:fixed;bottom:1.5rem;right:1.5rem;z-index:110;">
 	<Notification text={notification.text} type={notification.type} />
 </div>
+
+<ConfirmModal
+	show={confirmState.show}
+	title={confirmState.title}
+	message={confirmState.message}
+	onConfirm={confirmState.onConfirm}
+	onCancel={() => (confirmState.show = false)}
+/>

@@ -91,12 +91,15 @@ export const student = {
 	/**
 	 * @param {string} student_id
 	 * @param {string} election_id
+	 * @param {string} passcode_id
+	 * @param {string} adviser_id
 	 * @param {Array<{candidate_id: string, position: string}>} votes
 	 * @param {string} voting_pin
+	 * @param {string} session_passcode
 	 */
-	vote: (student_id, election_id, votes, voting_pin) =>
+	vote: (student_id, election_id, passcode_id, adviser_id, votes, voting_pin, session_passcode) =>
 		request('/api/student/vote', {
-			...json({ student_id, election_id, votes, voting_pin }),
+			...json({ student_id, election_id, passcode_id, adviser_id, votes, voting_pin, session_passcode }),
 			method: 'POST'
 		}),
 
@@ -123,7 +126,22 @@ export const student = {
 		request(`/api/student/vote-summary?student_id=${student_id}&election_id=${election_id}`),
 
 	/** @param {string} election_id */
-	getResults: (election_id) => request(`/api/student/results?election_id=${election_id}`)
+	getResults: (election_id) => request(`/api/student/results?election_id=${election_id}`),
+
+	/** @param {string} photo_url base64 data URL */
+	uploadProfilePhoto: (photo_url) =>
+		request('/api/student/profile-photo', {
+			...json({ photo_url }),
+			method: 'PUT'
+		}),
+
+	getProfilePhoto: () => request('/api/student/profile-photo'),
+
+	/** 
+	 * Helper to get the absolute URL for a candidate's photo
+	 * @param {string} candidate_id
+	 */
+	getCandidatePhotoUrl: (candidate_id) => `${BASE}/api/common/candidates/${candidate_id}/photo`
 };
 
 // ---------------------------------------------------------------------------
@@ -220,7 +238,23 @@ export const admin = {
 	createAdviser: (payload) => request('/api/admin/advisers', json(payload)),
 
 	/** @param {string} adviser_id */
-	deleteAdviser: (adviser_id) => request(`/api/admin/advisers/${adviser_id}`, { method: 'DELETE' })
+	deleteAdviser: (adviser_id) => request(`/api/admin/advisers/${adviser_id}`, { method: 'DELETE' }),
+
+	/** Fetch app branding/settings (public, no auth required) */
+	getSettings: () => request('/api/admin/settings'),
+
+	/**
+	 * @param {{ app_name?: string, primary_color?: string, accent_color?: string, logo_url?: string }} payload
+	 */
+	saveSettings: (payload) => request('/api/admin/settings', { ...json(payload), method: 'PUT' }),
+
+	/** @param {FormData} formData */
+	uploadLogo: (formData) => request('/api/admin/settings/logo', { method: 'POST', body: formData }),
+
+	/** @param {FormData} formData */
+	importAdvisers: (formData) => request('/api/admin/advisers/import', { method: 'POST', body: formData }),
+
+	downloadAdviserTemplate: () => `${BASE}/api/admin/advisers/import-template`
 };
 
 // ---------------------------------------------------------------------------
@@ -280,6 +314,20 @@ export const adviser = {
 	getPasscode: (election_id) => request(`/api/adviser/elections/${election_id}/passcode`),
 
 	/**
+	 * @param {string} candidate_id
+	 * @param {string} photo_url - base64 data URL
+	 */
+	uploadCandidatePhoto: (candidate_id, photo_url) =>
+		request(`/api/adviser/candidates/${candidate_id}/photo`, {
+			...json({ photo_url }),
+			method: 'PUT'
+		}),
+
+	/** @param {string} candidate_id */
+	deleteCandidatePhoto: (candidate_id) =>
+		request(`/api/adviser/candidates/${candidate_id}/photo`, { method: 'DELETE' }),
+
+	/**
 	 * @param {number} [page_size]
 	 * @param {string | null} [page_token]
 	 */
@@ -287,5 +335,33 @@ export const adviser = {
 		const params = new URLSearchParams({ page_size: String(page_size) });
 		if (page_token) params.set('page_token', page_token);
 		return request(`/api/adviser/audit-log?${params}`);
-	}
+	},
+
+	/**
+	 * @param {{ current_password: string, new_password: string }} payload
+	 */
+	changePassword: (payload) =>
+		request('/api/adviser/change-password', { ...json(payload), method: 'PUT' }),
+
+	/**
+	 * @param {string} election_id
+	 * @param {string} pin  - exactly 6 digits
+	 */
+	setEntryPin: (election_id, pin) =>
+		request(`/api/adviser/elections/${election_id}/set-entry-pin`, {
+			...json({ election_id, pin }),
+			method: 'POST'
+		}),
+
+	/** @param {string} election_id */
+	getEntryPin: (election_id) => request(`/api/adviser/elections/${election_id}/entry-pin`),
+
+	/** @param {string} query */
+	searchStudents: (query) => request(`/api/adviser/students/search?query=${encodeURIComponent(query)}`),
+
+	/** 
+	 * Helper to get the absolute URL for a candidate's photo 
+	 * @param {string} candidate_id
+	 */
+	getCandidatePhotoUrl: (candidate_id) => `${BASE}/api/common/candidates/${candidate_id}/photo`
 };

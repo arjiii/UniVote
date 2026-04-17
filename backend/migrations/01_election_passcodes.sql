@@ -34,14 +34,24 @@ DECLARE
     v_id UUID;
 BEGIN
     -- Deactivate existing passcodes for this election and adviser
-    UPDATE public.election_passcodes
-    SET is_active = FALSE
-    WHERE election_id = p_election_id AND adviser_id = p_adviser_id;
+    -- but FIRST, capture the existing entry_pin if it exists
+    DECLARE
+        v_preserved_pin TEXT;
+    BEGIN
+        SELECT entry_pin INTO v_preserved_pin
+        FROM public.election_passcodes
+        WHERE election_id = p_election_id AND adviser_id = p_adviser_id AND is_active = TRUE
+        LIMIT 1;
 
-    -- Insert new passcode
-    INSERT INTO public.election_passcodes (election_id, adviser_id, passcode, expires_at)
-    VALUES (p_election_id, p_adviser_id, p_passcode, p_expires_at)
-    RETURNING id INTO v_id;
+        UPDATE public.election_passcodes
+        SET is_active = FALSE
+        WHERE election_id = p_election_id AND adviser_id = p_adviser_id;
+
+        -- Insert new passcode with preserved entry_pin
+        INSERT INTO public.election_passcodes (election_id, adviser_id, passcode, expires_at, entry_pin)
+        VALUES (p_election_id, p_adviser_id, p_passcode, p_expires_at, v_preserved_pin)
+        RETURNING id INTO v_id;
+    END;
 
     RETURN jsonb_build_object('id', v_id, 'passcode', p_passcode, 'expires_at', p_expires_at);
 END;

@@ -1,7 +1,9 @@
 <script>
 	import { onMount } from 'svelte';
 	import { admin as adminApi } from '$lib/api.js';
+	import { branding } from '$lib/stores/branding.js';
 	import Notification from '$lib/components/Notification.svelte';
+	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
 
 	/** @type {Array<any>} */
 	let students = $state([]);
@@ -16,6 +18,15 @@
 	let isAddingStudent = $state(false);
 	let editingStudent = $state(/** @type {any} */ (null));
 	let showForm = $state(false);
+
+	// Confirmation Modal State
+	let confirmState = $state({
+		show: false,
+		title: '',
+		message: '',
+		onConfirm: () => {},
+		id: ''
+	});
 
 	/** @type {{ text: string, type: 'info' | 'success' | 'error' }} */
 	let notification = $state({ text: '', type: 'info' });
@@ -120,15 +131,24 @@
 		}
 	}
 
-	async function deleteStudent(/** @type {string} */ id) {
-		if (!confirm('Delete this student and their votes?')) return;
-		try {
-			await adminApi.deleteStudent(id);
-			students = students.filter((s) => s.student_id !== id);
-			notify('Student removed', 'success');
-		} catch (/** @type {any} */ err) {
-			notify(err.message ?? 'Failed to delete student', 'error');
-		}
+	function promptDelete(/** @type {any} */ student) {
+		confirmState = {
+			show: true,
+			title: 'Delete Student',
+			message: `Are you sure you want to remove ${student.full_name} (${student.student_id})? This will also remove any votes they have cast.`,
+			id: student.student_id,
+			onConfirm: async () => {
+				try {
+					await adminApi.deleteStudent(confirmState.id);
+					students = students.filter((s) => s.student_id !== confirmState.id);
+					notify('Student removed', 'success');
+				} catch (/** @type {any} */ err) {
+					notify(err.message ?? 'Failed to delete student', 'error');
+				} finally {
+					confirmState.show = false;
+				}
+			}
+		};
 	}
 
 	const filteredStudents = $derived(
@@ -142,7 +162,7 @@
 	);
 </script>
 
-<svelte:head><title>Voters | UniVote Admin</title></svelte:head>
+<svelte:head><title>Voter Registry | {$branding.appName}</title></svelte:head>
 
 <div class="dash">
 	<div class="dash-header">
@@ -154,22 +174,22 @@
 			<!-- Search -->
 			<div style="position:relative;">
 				<svg
-					style="position:absolute;left:0.625rem;top:50%;transform:translateY(-50%);width:1rem;height:1rem;color:var(--text-subtle);"
+					style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);width:0.875rem;height:0.875rem;color:var(--text-subtle);opacity:0.6;"
 					fill="none"
 					stroke="currentColor"
 					viewBox="0 0 24 24"
 					><path
 						stroke-linecap="round"
 						stroke-linejoin="round"
-						stroke-width="2"
+						stroke-width="2.5"
 						d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
 					/></svg
 				>
 				<input
 					bind:value={studentSearch}
 					placeholder="Search students…"
-					class="input-base btn-sm"
-					style="padding-left:2rem;width:200px;"
+					class="input-base"
+					style="padding-left:2.5rem;width:240px;height:2rem;font-size:0.75rem;font-family:sans-serif;"
 				/>
 			</div>
 			<button
@@ -370,7 +390,7 @@
 										>
 									</button>
 									<button
-										onclick={() => deleteStudent(student.student_id)}
+										onclick={() => promptDelete(student)}
 										class="btn-icon-danger"
 										title="Delete student"
 									>
@@ -414,3 +434,11 @@
 <div style="position:fixed;bottom:1.5rem;right:1.5rem;z-index:110;">
 	<Notification text={notification.text} type={notification.type} />
 </div>
+
+<ConfirmModal
+	show={confirmState.show}
+	title={confirmState.title}
+	message={confirmState.message}
+	onConfirm={confirmState.onConfirm}
+	onCancel={() => (confirmState.show = false)}
+/>

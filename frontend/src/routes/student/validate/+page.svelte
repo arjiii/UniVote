@@ -3,6 +3,7 @@
 	import { student as studentApi } from '$lib/api.js';
 	import { voterSession } from '$lib/stores/session.js';
 	import { theme, toggleTheme } from '$lib/stores/theme.js';
+	import { branding } from '$lib/stores/branding.js';
 	import GlassCard from '$lib/components/GlassCard.svelte';
 	import { fade, fly } from 'svelte/transition';
 
@@ -44,16 +45,19 @@
 </script>
 
 <svelte:head>
-	<title>Student Access | UniVote</title>
+	<title>Student Access | {$branding.appName}</title>
 </svelte:head>
 
 <!-- Full blue background -->
 <div class="auth-page">
-	<!-- Decorative spheres on the blue background -->
-	<div class="sphere sphere-1"></div>
-	<div class="sphere sphere-2"></div>
-	<div class="sphere sphere-3"></div>
-	<div class="sphere sphere-4"></div>
+	<!-- Decorative floating voting icons -->
+	<svg class="floating-icon floating-icon-xl" style="bottom: -80px; left: -60px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.5"><path d="M19 11V9a2 2 0 00-2-2H5a2 2 0 00-2 2v2m0 0a2 2 0 012 2h12a2 2 0 012-2M3 11v10h18V11M12 11v10m-3-6h6"/></svg>
+	<svg class="floating-icon floating-icon-lg" style="top: 10%; right: 5%; animation-delay: -2s; opacity: 0.05;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+	<svg class="floating-icon floating-icon-md" style="top: 65%; left: 30%; animation-delay: -5s;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+	<svg class="floating-icon floating-icon-sm" style="top: 25%; left: 5%; animation-delay: -8s; opacity: 0.06;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m12-9a4 4 0 11-8 0 4 4 0 018 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zm-2 4v-1a3 3 0 00-3-3h-1m1.5-9a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+	<svg class="floating-icon floating-icon-xs" style="top: 40%; right: 25%; animation-delay: -1s;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 00-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+	<svg class="floating-icon floating-icon-md" style="bottom: 10%; right: 40%; animation-delay: -12s; opacity: 0.04;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg>
+	<svg class="floating-icon floating-icon-sm" style="top: 80%; left: 10%; animation-delay: -4s;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 11V9a2 2 0 00-2-2H5a2 2 0 00-2 2v2m0 0a2 2 0 012 2h12a2 2 0 012-2M3 11v10h18V11M12 11v10m-3-6h6"/></svg>
 
 	<!-- Floating card container -->
 	<div class="auth-card">
@@ -61,9 +65,9 @@
 		<div class="auth-left">
 			<div class="auth-brand">
 				<button onclick={toggleTheme} class="auth-logo-btn">
-					<img src="/Messenger_creation_1261776042047231.jpeg" alt="UniVote Logo" class="auth-logo" />
+					<img src={$branding.logoUrl || "/Messenger_creation_1261776042047231.jpeg"} alt="{$branding.appName} Logo" class="auth-logo" />
 				</button>
-				<span class="auth-brand-name">UNIVOTE</span>
+				<span class="auth-brand-name">{$branding.appName.toUpperCase()}</span>
 			</div>
 
 			<div class="auth-hero">
@@ -85,13 +89,11 @@
 				</div>
 			</div>
 
-			<p class="auth-footer-text">© 2025 UNIVOTE</p>
+			<p class="auth-footer-text">© 2025 {$branding.appName.toUpperCase()}</p>
 		</div>
 
 		<!-- Right side: white form panel -->
 		<div class="auth-right">
-			<!-- Accent sphere bleeding into the white area -->
-			<div class="accent-sphere accent-sphere-br"></div>
 
 			<div class="auth-form-container" in:fade={{ duration: 400 }}>
 				<h1 class="form-title">STUDENT LOGIN</h1>
@@ -151,9 +153,9 @@
 	<div class="auth-mobile">
 		<div class="auth-mobile-header">
 			<button onclick={toggleTheme} class="auth-logo-btn auth-logo-btn-mobile">
-				<img src="/Messenger_creation_1261776042047231.jpeg" alt="UniVote Logo" class="auth-logo auth-logo-lg" />
+				<img src={$branding.logoUrl || "/Messenger_creation_1261776042047231.jpeg"} alt="{$branding.appName} Logo" class="auth-logo auth-logo-lg" />
 			</button>
-			<h1 class="auth-mobile-title">UNIVOTE</h1>
+			<h1 class="auth-mobile-title">{$branding.appName.toUpperCase()}</h1>
 			<p class="auth-mobile-sub">STUDENT PORTAL</p>
 		</div>
 
@@ -200,7 +202,7 @@
 			<a href="/" class="auth-btn-outline">BACK TO HOME</a>
 		</div>
 
-		<p class="auth-mobile-copyright">© 2025 UNIVOTE</p>
+		<p class="auth-mobile-copyright">© 2025 {$branding.appName.toUpperCase()}</p>
 	</div>
 </div>
 
@@ -209,7 +211,7 @@
 	.auth-page {
 		position: relative;
 		min-height: 100vh;
-		background: linear-gradient(135deg, #0b75fe 0%, #0052cc 50%, #003d99 100%);
+		background: linear-gradient(135deg, var(--brand-primary, #0b75fe) 0%, var(--brand-primary-hover, #0052cc) 50%, var(--brand-secondary, #003d99) 100%);
 		overflow: hidden;
 	}
 
@@ -304,16 +306,6 @@
 		background: var(--bg-card);
 	}
 
-	.accent-sphere {
-		position: absolute; border-radius: 50%; pointer-events: none; z-index: 0;
-	}
-	.accent-sphere-br {
-		width: 160px; height: 160px;
-		bottom: -50px; right: -50px;
-		background: radial-gradient(circle at 35% 35%, rgba(11,117,254,0.2), rgba(0,82,204,0.5) 60%, rgba(0,50,140,0.7));
-		box-shadow: inset -4px -4px 10px rgba(0,0,0,0.2);
-		animation: sphereBob2 14s ease-in-out infinite;
-	}
 
 	/* ====== FORM ====== */
 	.auth-form-container {
@@ -350,7 +342,7 @@
 
 	.auth-btn-primary {
 		width: 100%; padding: 0.875rem;
-		background: linear-gradient(135deg, #1a1a2e, #16213e);
+		background: linear-gradient(135deg, var(--brand-primary, #1a1a2e), var(--brand-primary-hover, #16213e));
 		color: white; border: none; border-radius: 10px;
 		font-size: 0.7rem; font-weight: 800; letter-spacing: 0.2em;
 		cursor: pointer; transition: all 0.2s ease;
@@ -382,36 +374,6 @@
 	.retry-badge {
 		flex-shrink: 0; border-radius: 4px; background: var(--status-danger-fg);
 		padding: 2px 8px; font-family: monospace; font-size: 0.6rem; font-weight: 900; color: white;
-	}
-
-	/* ====== SPHERES ====== */
-	.sphere { position: absolute; border-radius: 50%; z-index: 1; }
-	.sphere-1 {
-		width: 320px; height: 320px;
-		bottom: -80px; left: -60px;
-		background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15), rgba(0,82,204,0.5) 50%, rgba(0,40,120,0.8));
-		box-shadow: inset -10px -10px 30px rgba(0,0,0,0.3), 0 25px 80px rgba(0,0,0,0.15);
-		animation: sphereBob1 10s ease-in-out infinite;
-	}
-	.sphere-2 {
-		width: 140px; height: 140px;
-		top: 40px; right: 8%;
-		background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2), rgba(0,100,230,0.4) 60%, rgba(0,60,160,0.6));
-		box-shadow: inset -5px -5px 15px rgba(0,0,0,0.2), 0 15px 40px rgba(0,0,0,0.1);
-		animation: sphereBob2 12s ease-in-out infinite;
-	}
-	.sphere-3 {
-		width: 70px; height: 70px;
-		top: 60%; left: 35%;
-		background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.25), rgba(0,120,255,0.3) 70%);
-		box-shadow: inset -3px -3px 8px rgba(0,0,0,0.15);
-		animation: sphereBob3 14s ease-in-out infinite;
-	}
-	.sphere-4 {
-		width: 45px; height: 45px;
-		top: 20%; left: 30%;
-		background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3), rgba(0,100,220,0.25) 70%);
-		animation: sphereBob2 16s ease-in-out infinite reverse;
 	}
 
 	@keyframes sphereBob1 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(15px, -25px); } }

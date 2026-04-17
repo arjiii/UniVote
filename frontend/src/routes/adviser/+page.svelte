@@ -3,15 +3,29 @@
 	import { admin, adviser } from '$lib/api.js';
 	import { selectedElectionId } from '$lib/stores/election.js';
 	import { authSession } from '$lib/stores/auth.js';
+	import { branding } from '$lib/stores/branding.js';
 	import GlassCard from '$lib/components/GlassCard.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import { goto } from '$app/navigation';
 
 	/** @type {any[]} */
 	let elections = $state([]);
-	let summary = $state({ candidates: 0, partylists: 0, totalVotes: 0, votedCount: 0, notVotedCount: 0, totalVoters: 0 });
+	let summary = $state({ 
+		candidates: 0, 
+		partylists: 0, 
+		totalVotes: 0, 
+		votedCount: 0, 
+		notVotedCount: 0, 
+		totalVoters: 0,
+		turnoutPercentage: 0,
+		lastVoteAt: null
+	});
 	let isRefreshing = $state(false);
 	let activePasscode = $state({ code: '—', expires_at: null });
+	let entryPin = $state('');
+	let entryPinInput = $state('');
+	let isSavingPin = $state(false);
+	let pinMsg = $state('');
 
 	async function loadSummary() {
 		if (!$selectedElectionId) return;
@@ -39,13 +53,22 @@
 				totalVotes: voteCount,
 				votedCount: res.voted_count || 0,
 				notVotedCount: res.not_voted_count || 0,
-				totalVoters: res.total_voters || 0
+				totalVoters: res.total_voters || 0,
+				turnoutPercentage: res.turnout_percentage || 0,
+				lastVoteAt: res.last_vote_at
 			};
 
 			const pData = passRes.data;
 			activePasscode = pData
 				? { code: pData.passcode, expires_at: pData.expires_at }
 				: { code: '—', expires_at: null };
+
+			// Load entry PIN
+			try {
+				const pinRes = await adviser.getEntryPin($selectedElectionId);
+				entryPin = pinRes.entry_pin || '';
+				entryPinInput = entryPin;
+			} catch { /* ignore */ }
 		} catch (err) {
 			console.error('Failed to load dashboard summary:', err);
 		}
@@ -69,7 +92,6 @@
 		try {
 			const res = await adviser.refreshPasscode($selectedElectionId);
 			activePasscode = { code: res.adviser_passcode, expires_at: res.expires_at };
-			// No longer updating elections array directly for passcode as it's separate now
 		} catch (err) {
 			console.error('Failed to refresh passcode:', err);
 		} finally {
@@ -77,9 +99,52 @@
 		}
 	}
 
-	onMount(async () => {
-		await loadElections();
-		if ($selectedElectionId) await loadSummary();
+	async function saveEntryPin() {
+		if (!$selectedElectionId) return;
+		if (!/^\d{6}$/.test(entryPinInput)) {
+			pinMsg = 'Must be exactly 6 digits.';
+			setTimeout(() => (pinMsg = ''), 2500);
+			return;
+		}
+		isSavingPin = true;
+		try {
+			await adviser.setEntryPin($selectedElectionId, entryPinInput);
+			entryPin = entryPinInput;
+			pinMsg = 'PIN saved!';
+			setTimeout(() => (pinMsg = ''), 2500);
+		} catch (err) {
+			console.error('Failed to save PIN:', err);
+			pinMsg = 'Failed to save.';
+			setTimeout(() => (pinMsg = ''), 2500);
+		} finally {
+			isSavingPin = false;
+		}
+	}
+
+	async function checkPasscode() {
+		if (!$selectedElectionId) return;
+		try {
+			const passRes = await adviser.getPasscode($selectedElectionId);
+			const pData = passRes.data;
+			if (pData) {
+				activePasscode = { code: pData.passcode, expires_at: pData.expires_at };
+			}
+		} catch (err) {
+			console.error('Failed to poll passcode:', err);
+		}
+	}
+
+	onMount(() => {
+		loadElections().then(() => {
+			if ($selectedElectionId) loadSummary();
+		});
+
+		// Auto-refresh passcode every 30s to catch auto-regenerations
+		const interval = setInterval(() => {
+			if ($selectedElectionId) checkPasscode();
+		}, 30000);
+
+		return () => clearInterval(interval);
 	});
 
 	$effect(() => {
@@ -118,7 +183,7 @@
 	];
 </script>
 
-<svelte:head><title>Adviser Dashboard | UniVote</title></svelte:head>
+<svelte:head><title>Adviser Dashboard | {$branding.appName}</title></svelte:head>
 
 <div class="dash">
 	<!-- ── PAGE HEADER ── -->
@@ -222,9 +287,9 @@
 		<div class="kpi-card">
 			<div class="kpi-top">
 				<div>
-					<p class="kpi-eyebrow">Unique Voters</p>
+					<p class="kpi-eyebrow">Voted Students</p>
 					<p class="kpi-num">{summary.votedCount.toLocaleString()}</p>
-					<p class="kpi-delta" style="color:#68d391;"><span>▲</span> Cast Ballots</p>
+					<p class="kpi-delta" style="color:#68d391;"><span>▲</span> {summary.turnoutPercentage}% Turnout</p>
 				</div>
 				<div class="kpi-icon-box" style="background:linear-gradient(135deg,#11998e,#38ef7d);">
 					<svg
@@ -258,7 +323,7 @@
 		<div class="kpi-card">
 			<div class="kpi-top">
 				<div>
-					<p class="kpi-eyebrow">Pending Voters</p>
+					<p class="kpi-eyebrow">Pending</p>
 					<p class="kpi-num">{summary.notVotedCount.toLocaleString()}</p>
 					<p class="kpi-delta" style="color:var(--status-warning-fg);"><span>●</span> Not Yet Voted</p>
 				</div>
@@ -287,7 +352,12 @@
 					></div>
 				{/each}
 			</div>
-			<p class="kpi-sub" style="color:var(--text-subtle);">Total registered: {summary.totalVoters}</p>
+			<p class="kpi-sub" style="color:var(--text-subtle); display:flex; justify-content:space-between;">
+				<span>Total registered: {summary.totalVoters}</span>
+				{#if summary.lastVoteAt}
+					<span style="color:var(--brand-primary);">Last activity: {new Date(summary.lastVoteAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+				{/if}
+			</p>
 		</div>
 	</div>
 
@@ -296,38 +366,72 @@
 		<!-- Passcode Panel -->
 		<div class="dash-card passcode-card">
 			{#if currentElection}
-				<div style="display:flex;flex-direction:column;gap:0.875rem;">
-					<!-- Row 1: Icon+Title left, Button right -->
-					<div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
-						<div style="display:flex;align-items:center;gap:0.75rem;">
-							<div style="width:36px;height:36px;background:linear-gradient(135deg,rgba(0,210,255,0.15),rgba(11,117,254,0.15));color:var(--brand-primary);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-								<svg style="width:18px;height:18px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
-									><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg
-								>
-							</div>
-							<div>
-								<p class="card-title" style="margin-bottom:0.1rem;">Student Entry Passcode</p>
-								<p style="font-size:0.75rem;color:var(--text-subtle);margin:0;">Share with students to access the <strong>{currentElection.name}</strong> ballot.</p>
-							</div>
-						</div>
-						<button onclick={refreshPasscode} disabled={isRefreshing} class="btn-primary" style="height:36px;display:inline-flex;flex-shrink:0;white-space:nowrap;font-size:0.75rem;">
-							<svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
-								><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg
+				<div style="display:flex;flex-direction:column;gap:1rem;">
+					<!-- Title -->
+					<div style="display:flex;align-items:center;gap:0.75rem;">
+						<div style="width:36px;height:36px;background:linear-gradient(135deg,rgba(0,210,255,0.15),rgba(11,117,254,0.15));color:var(--brand-primary);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+							<svg style="width:18px;height:18px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+								><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg
 							>
-							{isRefreshing ? 'Refreshing…' : 'Generate New Passcode'}
-						</button>
+						</div>
+						<div>
+							<p class="card-title" style="margin-bottom:0.1rem;">Voting Access Controls</p>
+							<p style="font-size:0.75rem;color:var(--text-subtle);margin:0;">Manage entry PIN and session passcode for <strong>{currentElection.name}</strong>.</p>
+						</div>
 					</div>
-					<!-- Row 2: Full-width passcode box -->
-					<div style="display:flex;align-items:center;gap:1rem;background:var(--bg-elevated);padding:0.625rem 1rem;border-radius:10px;border:1px dashed var(--border-strong);">
-						<code style="font-size:1.1rem;font-weight:800;color:var(--brand-primary);letter-spacing:0.12em;">{activePasscode.code}</code>
-						{#if activePasscode.expires_at}
-							<div style="display:flex;flex-direction:column;border-left:1px solid var(--border-main);padding-left:0.75rem;margin-left:auto;flex-shrink:0;">
-								<span style="font-size:0.6rem;font-weight:700;color:var(--text-subtle);text-transform:uppercase;letter-spacing:0.08em;">Expires</span>
-								<span style="font-size:0.8rem;font-weight:600;color:var(--status-warning-fg);">
-									{new Date(activePasscode.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-								</span>
+
+					<!-- Two panels side by side -->
+					<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.875rem;">
+
+						<!-- Panel 1: Adviser Entry PIN (6-digit, adviser sets) -->
+						<div style="background:var(--bg-elevated);border-radius:12px;padding:1rem;border:1px solid var(--border-main);display:flex;flex-direction:column;gap:0.75rem;">
+							<div>
+								<p style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-subtle);margin:0 0 0.2rem;">🔑 Entry PIN</p>
+								<p style="font-size:0.7rem;color:var(--text-subtle);margin:0;">6-digit PIN you choose. Shared with students before they can access the voting page.</p>
 							</div>
-						{/if}
+							{#if entryPin}
+								<code style="font-size:1.5rem;font-weight:900;color:var(--brand-primary);letter-spacing:0.25em;display:block;text-align:center;padding:0.5rem 0;">{entryPin}</code>
+							{/if}
+							<div style="display:flex;gap:0.5rem;align-items:center;">
+								<input
+									type="text"
+									inputmode="numeric"
+									maxlength="6"
+									placeholder="000000"
+									bind:value={entryPinInput}
+									style="flex:1;background:var(--bg-card);border:1.5px solid var(--border-main);border-radius:8px;padding:0.5rem 0.75rem;color:var(--text-main);font-family:monospace;font-size:1rem;font-weight:700;letter-spacing:0.18em;text-align:center;outline:none;"
+								/>
+								<button
+									onclick={saveEntryPin}
+									disabled={isSavingPin}
+									class="btn-primary"
+									style="padding:0.5rem 0.75rem;font-size:0.75rem;white-space:nowrap;"
+								>Set PIN</button>
+							</div>
+							{#if pinMsg}
+								<p style="font-size:0.7rem;font-weight:600;color:{pinMsg === 'PIN saved!' ? 'var(--status-success-fg)' : 'var(--status-danger-fg)'};margin:0;">{pinMsg}</p>
+							{/if}
+						</div>
+
+						<!-- Panel 2: Session Passcode (8-char auto-generated) -->
+						<div style="background:var(--bg-elevated);border-radius:12px;padding:1rem;border:1px solid var(--border-main);display:flex;flex-direction:column;gap:0.75rem;">
+							<div>
+								<p style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-subtle);margin:0 0 0.2rem;">🎲 Session Passcode</p>
+								<p style="font-size:0.7rem;color:var(--text-subtle);margin:0;">8-char code auto-generated per adviser. Students enter this before casting their vote.</p>
+							</div>
+							<code style="font-size:1.25rem;font-weight:900;color:var(--brand-primary);letter-spacing:0.2em;display:block;text-align:center;padding:0.5rem 0;">{activePasscode.code}</code>
+							{#if activePasscode.expires_at}
+								<p style="font-size:0.6875rem;color:var(--status-warning-fg);font-weight:600;margin:0;text-align:center;">Expires {new Date(activePasscode.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+							{/if}
+							<button
+								onclick={refreshPasscode}
+								disabled={isRefreshing}
+								class="btn-primary"
+								style="font-size:0.75rem;white-space:nowrap;"
+							>
+								{isRefreshing ? 'Generating…' : '↻ Generate New Passcode'}
+							</button>
+						</div>
 					</div>
 				</div>
 			{:else}
@@ -463,6 +567,8 @@
 		font-weight: 600;
 		cursor: pointer;
 		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+		min-width: 200px;
+		max-width: 450px;
 	}
 
 	/* ── KPI Row ── */

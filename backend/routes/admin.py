@@ -1,4 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from models import (
     ElectionCreate,
     ElectionUpdate,
@@ -6,6 +7,8 @@ from models import (
     StudentManualCreate,
     StudentUpdate,
     AdviserCreate,
+    AppSettingsUpdate,
+    AdviserImportRow,
 )
 from services import election_service, audit_service
 from deps import require_admin, require_adviser, AuthUser
@@ -14,6 +17,7 @@ from passlib.hash import argon2
 import csv
 from io import StringIO
 from typing import Optional
+import uuid as _uuid
 
 router = APIRouter()
 
@@ -166,7 +170,7 @@ async def get_advisers(
 ):
     result = await paginate(
         table="advisers",
-        select="id, full_name, email, department, created_at",
+        select="id, full_name, email, id_number, department, created_at",
         order_column="id",
         page_size=page_size,
         page_token=page_token,
@@ -198,6 +202,7 @@ async def create_adviser(
         .insert(
             {
                 "email": adviser.email,
+                "id_number": adviser.id_number,
                 "full_name": adviser.full_name,
                 "password_hash": hashed,
                 "department": adviser.department,
@@ -221,8 +226,6 @@ async def delete_adviser(
     adviser_id: str,
     user: AuthUser = Depends(require_admin),
 ):
-    # Note: deleting an adviser won't delete their created partylists/candidates
-    # unless we want to cascade that too. For now just delete the user.
     supabase = await get_async_supabase()
     res = await supabase.table("advisers").delete().eq("id", adviser_id).execute()
     if not res.data:
@@ -236,6 +239,104 @@ async def delete_adviser(
         target_id=adviser_id,
     )
     return {"message": "Adviser account deleted."}
+
+
+@router.get("/advisers/import-template")
+async def download_adviser_template():
+    """Return a CSV template for bulk adviser import."""
+    csv_content = "full_name,email,employee_id,department\nProf. Jane Doe,jane.doe@school.edu,EMP-001,CITE\n"
+    return StreamingResponse(
+        iter([csv_content]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=advisers_template.csv"},
+    )
+
+
+@router.post("/advisers/import")
+async def import_advisers(
+    file: UploadFile = File(...),
+    user: AuthUser = Depends(require_admin),
+):
+    """Bulk import advisers from CSV. Default password is Changeme@<employee_id>.
+    Advisers will be forced to change their password on first login.
+    CSV columns: full_name, email, employee_id (required, becomes login ID), department (optional)
+    """
+    contents = await file.read()
+    try:
+        reader = csv.DictReader(StringIO(contents.decode("utf-8")))
+        rows = list(reader)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid CSV file.")
+
+    if not rows:
+        raise HTTPException(status_code=400, detail="CSV file is empty.")
+
+    supabase = await get_async_supabase()
+    created = []
+    skipped = []
+
+    for row in rows:
+        full_name = (row.get("full_name") or "").strip()
+        email = (row.get("email") or "").strip().lower()
+        department = (row.get("department") or "").strip() or None
+        # employee_id is required; fall back to deriving from email if omitted
+        employee_id = (row.get("employee_id") or "").strip()
+        if not employee_id:
+            employee_id = email.split("@")[0].replace(".", "")[:20] if email else ""
+
+        if not full_name or not email or not employee_id:
+            skipped.append({"reason": "Missing full_name, email, or employee_id", "row": row})
+            continue
+
+        # Check duplicate by email
+        email_exists = await supabase.table("advisers").select("id").eq("email", email).execute()
+        if email_exists.data:
+            skipped.append({"reason": "Email already exists", "email": email})
+            continue
+
+        # Check duplicate by employee_id (id_number)
+        id_exists = await supabase.table("advisers").select("id").eq("id_number", employee_id).execute()
+        if id_exists.data:
+            # Append suffix to make unique
+            employee_id = employee_id + _uuid.uuid4().hex[:4]
+
+        default_password = f"UV@{employee_id}"
+        hashed = argon2.hash(default_password)
+
+        payload = {
+            "full_name": full_name,
+            "email": email,
+            "id_number": employee_id,
+            "password_hash": hashed,
+            "must_change_password": True,
+        }
+        if department:
+            payload["department"] = department
+
+        res = await supabase.table("advisers").insert(payload).execute()
+        if res.data:
+            created.append({
+                "full_name": full_name,
+                "email": email,
+                "employee_id": employee_id,
+                "default_password": default_password,
+            })
+        else:
+            skipped.append({"reason": "DB insert failed", "email": email})
+
+    await audit_service.log_action(
+        actor_id=user.id,
+        actor_role="admin",
+        action="IMPORT_ADVISERS",
+        target_type="adviser",
+        details={"created": len(created), "skipped": len(skipped)},
+    )
+    return {
+        "message": f"Imported {len(created)} adviser(s), skipped {len(skipped)}.",
+        "created": created,
+        "skipped": skipped,
+    }
+
 
 
 @router.post("/students/upload")
@@ -287,3 +388,104 @@ async def get_audit_log(
         page_token=page_token,
     )
     return result
+
+
+# ---------------------------------------------------------------------------
+# App Settings (Branding & Customisation)
+# ---------------------------------------------------------------------------
+
+@router.get("/settings")
+async def get_settings():
+    """Public endpoint — returns branding settings. Returns defaults if table not yet created."""
+    defaults = {
+        "app_name": "UniVote",
+        "primary_color": "#0b75fe",
+        "accent_color": "#5c60f5",
+        "logo_url": None,
+    }
+    try:
+        supabase = await get_async_supabase()
+        res = await supabase.table("app_settings").select("*").eq("id", 1).execute()
+        if res.data:
+            return {"data": res.data[0]}
+    except Exception:
+        pass
+    return {"data": defaults}
+
+
+@router.put("/settings")
+async def update_settings(
+    payload: AppSettingsUpdate,
+    user: AuthUser = Depends(require_admin),
+):
+    update_data = payload.dict(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields to update.")
+
+    try:
+        supabase = await get_async_supabase()
+        update_data["id"] = 1
+        res = await supabase.table("app_settings").upsert(update_data).execute()
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Database error: the app_settings table may not exist yet. "
+                "Please run the setup SQL in your Supabase SQL editor. "
+                f"Details: {e}"
+            ),
+        )
+
+    await audit_service.log_action(
+        actor_id=user.id,
+        actor_role="admin",
+        action="UPDATE_APP_SETTINGS",
+        target_type="app_settings",
+        details=payload.dict(exclude_unset=True),
+    )
+    return {"message": "Settings updated.", "data": res.data[0] if res.data else update_data}
+
+
+@router.post("/settings/logo")
+async def upload_logo(
+    file: UploadFile = File(...),
+    user: AuthUser = Depends(require_admin),
+):
+    """Upload a logo image to Supabase Storage and save the public URL."""
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image files are allowed.")
+
+    contents = await file.read()
+    ext = (file.filename or "logo").rsplit(".", 1)[-1].lower()
+    allowed_exts = {"png", "jpg", "jpeg", "gif", "svg", "webp"}
+    if ext not in allowed_exts:
+        raise HTTPException(status_code=400, detail=f"Extension .{ext} not allowed.")
+
+    file_path = f"logo_{_uuid.uuid4().hex}.{ext}"
+
+    try:
+        supabase = await get_async_supabase()
+        storage = supabase.storage.from_("logos")
+        await storage.upload(
+            path=file_path,
+            file=contents,
+            file_options={"content-type": file.content_type, "upsert": "true"},
+        )
+        public_url_res = storage.get_public_url(file_path)
+        logo_url = public_url_res if isinstance(public_url_res, str) else str(public_url_res)
+
+        await supabase.table("app_settings").upsert({"id": 1, "logo_url": logo_url}).execute()
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Storage upload failed: {e}. Ensure the 'logos' bucket exists in Supabase Storage.",
+        )
+
+    await audit_service.log_action(
+        actor_id=user.id,
+        actor_role="admin",
+        action="UPLOAD_LOGO",
+        target_type="app_settings",
+        details={"logo_url": logo_url},
+    )
+    return {"message": "Logo uploaded.", "logo_url": logo_url}

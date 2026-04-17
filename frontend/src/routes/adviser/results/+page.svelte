@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { admin, adviser } from '$lib/api.js';
 	import { selectedElectionId } from '$lib/stores/election.js';
+	import { branding } from '$lib/stores/branding.js';
 	import { sortPositions, calculateWinners } from '$lib/constants.js';
 	import { BASE } from '$lib/api.js';
 
@@ -16,6 +17,7 @@
 	let electionStatus = $state('');
 	let sseConnected = $state(false);
 	let lastUpdated = $state('');
+	let isLoading = $state(false);
 
 	/** @type {EventSource | null} */
 	let eventSource = null;
@@ -34,6 +36,7 @@
 	/** @param {string} electionId */
 	async function loadData(electionId) {
 		if (!electionId) return;
+		isLoading = true;
 		try {
 			const [cRes, rRes] = await Promise.all([
 				adviser.getCandidates(electionId),
@@ -44,12 +47,17 @@
 			if (fetched.tallies) {
 				liveResults = fetched.tallies;
 				electionStatus = fetched.status;
+			} else if (fetched.status === 'upcoming') {
+				liveResults = {};
+				electionStatus = fetched.status;
 			} else {
 				liveResults = fetched;
 			}
 			lastUpdated = new Date().toLocaleTimeString();
 		} catch (err) {
 			console.error('Failed to load data:', err);
+		} finally {
+			isLoading = false;
 		}
 	}
 
@@ -77,6 +85,9 @@
 				const payload = JSON.parse(e.data);
 				if (payload.tallies) {
 					liveResults = payload.tallies;
+					electionStatus = payload.status;
+				} else if (payload.status === 'upcoming') {
+					liveResults = {};
 					electionStatus = payload.status;
 				} else {
 					liveResults = payload;
@@ -141,7 +152,7 @@
 	}
 </script>
 
-<svelte:head><title>Live Tally | UniVote Admin</title></svelte:head>
+<svelte:head><title>Results | {$branding.appName}</title></svelte:head>
 
 <div class="dash">
 	<div class="dash-header">
@@ -172,7 +183,7 @@
 					id="election-select"
 					bind:value={$selectedElectionId}
 					class="input-base btn-sm"
-					style="width:220px;"
+					style="min-width:200px; width:auto; max-width:450px;"
 				>
 					<option value="" disabled>Select Session</option>
 					{#each elections as election}
@@ -200,6 +211,33 @@
 			<h3 class="empty-state-title">Select an Election</h3>
 			<p class="empty-state-text">
 				Choose an election session from the menu above to view its real-time results.
+			</p>
+		</div>
+	{:else if isLoading}
+		<div style="display:flex;flex-direction:column;gap:2rem;">
+			<div class="bento-grid bento-2col">
+				{#each [1, 2, 3, 4] as i}
+					<div class="admin-card skeleton" style="height:250px;opacity:0.5;"></div>
+				{/each}
+			</div>
+		</div>
+	{:else if electionStatus === 'upcoming'}
+		<div class="empty-state">
+			<svg
+				class="empty-state-icon"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.5"
+				viewBox="0 0 24 24"
+				><path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+				/></svg
+			>
+			<h3 class="empty-state-title">Election Not Started</h3>
+			<p class="empty-state-text">
+				Live results for this election will be available once the voting period officially begins.
 			</p>
 		</div>
 	{:else if positions.length === 0}

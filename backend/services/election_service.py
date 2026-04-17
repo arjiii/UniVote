@@ -146,7 +146,7 @@ async def get_available_elections() -> list:
     result = (
         await supabase.table("elections")
         .select("id, name, start_date, end_date, description, status")
-        .in_("status", ["active", "completed"])
+        .in_("status", ["active", "completed", "upcoming"])
         .execute()
     )
     return result.data or []
@@ -267,13 +267,57 @@ async def delete_student(student_id: str) -> dict:
     )
     if not student_res.data:
         raise HTTPException(status_code=404, detail="Student not found.")
+    uuid = student_res.data[0]["id"]
+    
+    # 2. Delete votes
+    await supabase.table("votes").delete().eq("student_id", uuid).execute()
+    
+    # 3. Delete student
+    await supabase.table("students").delete().eq("id", uuid).execute()
+    
+    return {"message": "Student and related votes deleted successfully."}
 
-    student_uuid = student_res.data[0]["id"]
 
-    # 1. Delete votes
-    await supabase.table("votes").delete().eq("student_id", student_uuid).execute()
+async def auto_transition_status() -> dict:
+    """
+    Check all upcoming and active elections and transition them 
+    automatically based on their scheduled dates.
+    """
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    supabase = await get_async_supabase()
 
-    # 2. Delete student
-    await supabase.table("students").delete().eq("id", student_uuid).execute()
+    summary = {"started": 0, "ended": 0}
 
-    return {"message": "Student and their votes deleted successfully."}
+    # 1. Upcoming -> Active
+    upcoming_to_start = (
+        await supabase.table("elections")
+        .select("id, name, start_date")
+        .eq("status", "upcoming")
+        .lte("start_date", now_iso)
+        .execute()
+    )
+
+    for election in upcoming_to_start.data:
+        await supabase.table("elections").update({"status": "active"}).eq("id", election["id"]).execute()
+        summary["started"] += 1
+        print(f"[Scheduler] Auto-started election: {election['name']} ({election['id']})")
+
+    # 2. Active -> Completed
+    active_to_end = (
+        await supabase.table("elections")
+        .select("id, name, end_date")
+        .eq("status", "active")
+        .lte("end_date", now_iso)
+        .execute()
+    )
+
+    for election in active_to_end.data:
+        await supabase.table("elections").update({
+            "status": "completed", 
+            "ended_at": now_iso
+        }).eq("id", election["id"]).execute()
+        summary["ended"] += 1
+        print(f"[Scheduler] Auto-ended election: {election['name']} ({election['id']})")
+
+    return summary

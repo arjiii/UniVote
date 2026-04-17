@@ -35,7 +35,7 @@ async def login(request: Request, body: LoginRequest):
         # Check advisers next
         adviser_check = (
             await supabase.table("advisers")
-            .select("id, full_name, password_hash")
+            .select("id, full_name, password_hash, must_change_password")
             .eq("id_number", body.username)
             .execute()
         )
@@ -71,6 +71,7 @@ async def login(request: Request, body: LoginRequest):
         "role": role,
         "full_name": user["full_name"],
         "user_id": user["id"],
+        "must_change_password": bool(user.get("must_change_password")) if role == "adviser" else False,
     }
 
 

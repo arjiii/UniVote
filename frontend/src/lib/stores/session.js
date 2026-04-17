@@ -8,7 +8,21 @@ const SESSION_KEY = 'univote_voter_session';
  * @property {string} student_id - Human readable ID
  * @property {string} full_name
  * @property {string} access_token - JWT for voting
- * @property {Array<{id: string, name: string, has_voted: boolean, end_date?: string}>} [elections]
+ * @property {string} program
+ * @property {number} year_level
+ * @property {string} [photo_url] - Student profile picture (base64)
+ * @property {Array<{id: string, name: string, has_voted: boolean, status: string, start_date?: string, end_date?: string}>} [elections]
+ */
+
+/**
+ * @typedef {Object} VoterSessionStore
+ * @property {(this: void, run: import('svelte/store').Subscriber<StudentSession | null>, invalidate?: (() => void) | undefined) => import('svelte/store').Unsubscriber} subscribe
+ * @property {(data: any) => void} login
+ * @property {(electionId: string) => void} markVoted
+ * @property {(fn: (session: StudentSession | null) => StudentSession | null) => void} update
+ * @property {() => void} logout
+ * @property {(studentId: string) => Promise<any>} sync
+ * @property {(electionId: string) => string} getElectionStatus
  */
 
 function createSessionStore() {
@@ -35,6 +49,7 @@ function createSessionStore() {
 				id: student.id,
 				program: student.program,
 				year_level: student.year_level,
+				photo_url: student.photo_url || null,
 				elections: data.active_elections || data.elections || []
 			};
 			if (typeof window !== 'undefined') {
@@ -59,6 +74,16 @@ function createSessionStore() {
 				return updated;
 			});
 		},
+		/** @param {(session: StudentSession | null) => StudentSession | null} fn */
+		update(fn) {
+			update((session) => {
+				const next = fn(session);
+				if (typeof window !== 'undefined' && next) {
+					localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+				}
+				return next;
+			});
+		},
 		logout() {
 			if (typeof window !== 'undefined') {
 				localStorage.removeItem(SESSION_KEY);
@@ -77,9 +102,20 @@ function createSessionStore() {
 				console.error('Session sync failed:', err);
 				throw err;
 			}
+		},
+		/** @param {string} electionId */
+		getElectionStatus(electionId) {
+			let status = 'unknown';
+			subscribe((session) => {
+				if (!session || !session.elections) return;
+				const e = session.elections.find((el) => el.id === electionId);
+				if (e) status = e.status;
+			})();
+			return status;
 		}
 	};
 }
 
 
+/** @type {VoterSessionStore} */
 export const voterSession = createSessionStore();

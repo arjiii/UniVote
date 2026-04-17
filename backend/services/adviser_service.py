@@ -168,6 +168,23 @@ async def get_live_results(election_id: str) -> dict:
     )
     status = elec_res.data[0]["status"] if elec_res.data else "unknown"
 
+    # Fetch total registered students efficiently (count only, no data)
+    students_count_res = (
+        await supabase.table("students").select("*", count="exact", head=True).execute()
+    )
+    total_registered = students_count_res.count or 0
+
+    # Mask results if the election is not yet active (or completed)
+    if status == "upcoming":
+        return {
+            "status": "upcoming",
+            "tallies": {},
+            "total_voters": total_registered,
+            "voted_count": 0,
+            "not_voted_count": total_registered,
+            "message": "Live results will be available once the election begins."
+        }
+
     # Fetch all candidates first to establish the baseline (including 0 votes)
     candidates_res = (
         await supabase.table("candidates")
@@ -176,16 +193,17 @@ async def get_live_results(election_id: str) -> dict:
         .execute()
     )
 
-    # Fetch only the student_id column for actual cast votes to calculate participation
+    # Fetch cast votes with timestamps to calculate participation and last activity
     votes_res = (
         await supabase.table("votes")
-        .select("position, candidate_id, student_id")
+        .select("position, candidate_id, student_id, created_at")
         .eq("election_id", election_id)
         .execute()
     )
 
     tallies: dict = {}
     unique_voters = set()
+    last_vote_at = None
 
     # Initialize all candidates with 0 votes to ensure they appear on the dashboard
     for cand in candidates_res.data:
@@ -194,22 +212,25 @@ async def get_live_results(election_id: str) -> dict:
         tallies.setdefault(pos, {})
         tallies[pos][cid] = 0
 
-    # Tally up the actual cast votes
+    # Tally up the actual cast votes and find the latest activity
     for vote in votes_res.data or []:
         pos = vote["position"]
         cid = vote["candidate_id"]
         voter_id = vote.get("student_id")
+        vote_time = vote.get("created_at")
+
         if voter_id:
             unique_voters.add(voter_id)
+        
+        if vote_time:
+            if not last_vote_at or vote_time > last_vote_at:
+                last_vote_at = vote_time
+
         if pos in tallies and cid in tallies[pos]:
             tallies[pos][cid] += 1
 
-    # Fetch total registered students efficiently (count only, no data)
-    students_count_res = (
-        await supabase.table("students").select("*", count="exact", head=True).execute()
-    )
-    total_registered = students_count_res.count or 0
     voted_count = len(unique_voters)
+    turnout_pct = (voted_count / total_registered * 100) if total_registered > 0 else 0
 
     return {
         "status": status,
@@ -217,22 +238,34 @@ async def get_live_results(election_id: str) -> dict:
         "total_voters": total_registered,
         "voted_count": voted_count,
         "not_voted_count": max(0, total_registered - voted_count),
+        "turnout_percentage": round(turnout_pct, 1),
+        "last_vote_at": last_vote_at
     }
 
 
 async def refresh_adviser_passcode(election_id: str, adviser_id: str) -> dict:
-    """Generate a new 16-digit alphanumeric passcode for an election and adviser."""
-    # Format: XXXX-XXXX-XXXX-XXXX
+    """Generate a new 8-character alphanumeric session passcode for an adviser.
+    Each adviser gets their own independent passcode for the same election.
+    Ensures that any existing 'entry_pin' is preserved.
+    """
     alphabet = string.ascii_uppercase + string.digits
-    blocks = []
-    for _ in range(4):
-        blocks.append("".join(secrets.choice(alphabet) for _ in range(4)))
-
-    new_passcode = "-".join(blocks)
+    new_passcode = "".join(secrets.choice(alphabet) for _ in range(8))
     expires_at = (datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat()
 
     supabase = await get_async_supabase()
-    # Call the atomic RPC function
+
+    # 1. Fetch existing entry_pin if any
+    existing = (
+        await supabase.table("election_passcodes")
+        .select("entry_pin")
+        .eq("election_id", election_id)
+        .eq("adviser_id", adviser_id)
+        .eq("is_active", True)
+        .execute()
+    )
+    preserved_pin = existing.data[0].get("entry_pin") if existing.data else None
+
+    # 2. Call the atomic RPC function (which handles deactivation of old rows)
     res = await supabase.rpc(
         "generate_election_passcode",
         {
@@ -248,11 +281,24 @@ async def refresh_adviser_passcode(election_id: str, adviser_id: str) -> dict:
             status_code=500, detail="Failed to generate passcode via RPC."
         )
 
+    new_id = res.data.get("id")
+
+    # 3. If we had a pin, ensure it's on the new record (Safeguard in case RPC isn't updated)
+    if preserved_pin and new_id:
+        await (
+            supabase.table("election_passcodes")
+            .update({"entry_pin": preserved_pin})
+            .eq("id", new_id)
+            .execute()
+        )
+
     return res.data
 
 
 async def get_active_passcode(election_id: str, adviser_id: str) -> Optional[dict]:
-    """Retrieve the current active and non-expired passcode for an adviser."""
+    """Retrieve the current active and non-expired passcode for an adviser.
+    Auto-regenerates if no active/non-expired passcode is found.
+    """
     supabase = await get_async_supabase()
     now = datetime.now(timezone.utc).isoformat()
 
@@ -268,4 +314,21 @@ async def get_active_passcode(election_id: str, adviser_id: str) -> Optional[dic
         .execute()
     )
 
-    return res.data[0] if res.data else None
+    if res.data:
+        return res.data[0]
+    
+    # Auto-regenerate if missing or expired
+    print(f"[Passcode] Auto-refreshing passcode for adviser {adviser_id} (expired or missing)")
+    return await refresh_adviser_passcode(election_id, adviser_id)
+async def search_students(query: str, limit: int = 5) -> list:
+    """Search for students by student_id or full_name with prefix matching."""
+    supabase = await get_async_supabase()
+    # Search by student_id prefix or full_name (case-insensitive)
+    res = (
+        await supabase.table("students")
+        .select("id, student_id, full_name, program, year_level")
+        .or_(f"student_id.ilike.{query}%,full_name.ilike.%{query}%")
+        .limit(limit)
+        .execute()
+    )
+    return res.data or []

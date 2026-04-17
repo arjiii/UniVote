@@ -2,17 +2,20 @@
 	import { onMount } from 'svelte';
 	import { student as studentApi } from '$lib/api.js';
 	import { voterSession } from '$lib/stores/session.js';
+	import { branding } from '$lib/stores/branding.js';
 	import { fade } from 'svelte/transition';
 
 	let isLoading = $state(!$voterSession?.student_id);
-	/** @type {Array<{id: string, name: string, end_date?: string, has_voted: boolean}>} */
+	/** @type {Array<{id: string, name: string, start_date?: string, end_date?: string, has_voted: boolean, status: string}>} */
 	let elections = $derived($voterSession?.elections || []);
+	let activeElections = $derived(elections.filter((e) => e.status === 'active'));
+	let upcomingElections = $derived(elections.filter((e) => e.status === 'upcoming'));
 	let voterName = $derived($voterSession?.full_name || 'Student');
 
 	const stats = $derived({
 		total: elections.length,
 		voted: elections.filter((e) => e.has_voted).length,
-		pending: elections.filter((e) => !e.has_voted).length
+		pending: activeElections.filter((e) => !e.has_voted).length
 	});
 
 	/** @param {string} name */
@@ -67,7 +70,7 @@
 	});
 </script>
 
-<svelte:head><title>Student Dashboard | UniVote</title></svelte:head>
+<svelte:head><title>Dashboard | {$branding.appName}</title></svelte:head>
 
 {#if isLoading}
 	<div class="loader-container">
@@ -76,8 +79,10 @@
 	</div>
 {:else}
 	<div class="page-header">
-		<div class="breadcrumb">Student Portal</div>
-		<h1 class="greeting">{getGreeting(voterName.split(' ')[0])}</h1>
+		<div class="greeting-container">
+			<div class="breadcrumb">PAGES / STUDENT DASHBOARD</div>
+			<h1 class="greeting">{getGreeting(voterName.split(' ')[0])}</h1>
+		</div>
 	</div>
 
 	<div class="stats-grid">
@@ -123,155 +128,201 @@
 
 	<div class="section-row">
 		<h2 class="section-title">Active Elections</h2>
-		<span class="active-pill">{elections.length} Active</span>
+		<span class="active-pill">{activeElections.length} Active</span>
 	</div>
 
 	<div class="elections-list">
-		{#each elections as election, idx}
-			<div class="election-item" in:fade={{ duration: 300, delay: idx * 80 }}>
-				<div class="election-main">
-					<div class="election-icon-bg" class:is-voted={election.has_voted}>
-						{#if election.has_voted}
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-						{:else}
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-						{/if}
-					</div>
-					<div class="election-info">
-						<div class="election-name-row">
-							<h3 class="election-name">{election.name}</h3>
+		{#if activeElections.length === 0}
+			<div class="empty-state-mini">No active elections at the moment.</div>
+		{:else}
+			{#each activeElections as election, idx}
+				<div class="election-item" in:fade={{ duration: 300, delay: idx * 80 }}>
+					<div class="election-main">
+						<div class="election-icon-bg" class:is-voted={election.has_voted}>
 							{#if election.has_voted}
-								<div class="voted-tag"><div class="dot"></div>Voted</div>
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+							{:else}
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
 							{/if}
 						</div>
-						<div class="election-meta">Ends {new Date(election.end_date || Date.now()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+						<div class="election-info">
+							<div class="election-name-row">
+								<h3 class="election-name">{election.name}</h3>
+								{#if election.has_voted}
+									<div class="voted-tag"><div class="dot"></div>Voted</div>
+								{/if}
+							</div>
+							<div class="election-meta">Ends {new Date(election.end_date || Date.now()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+						</div>
 					</div>
-				</div>
 
-				<div class="election-actions">
-					{#if election.has_voted}
-						<button class="btn-action btn-blue" onclick={() => toggleReceipt(election.id)}>
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-							{selectedSummaryId === election.id ? 'Hide Receipt' : 'View Receipt'}
-						</button>
-					{:else}
-						<a href="/student/ballot?election={election.id}" class="btn-action btn-blue" style="background:var(--accent);">
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-							Cast Vote
-						</a>
-					{/if}
-					<a href="/student/results?election={election.id}" class="btn-action btn-ghost">
-						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-						View Results
-					</a>
-				</div>
-
-				{#if selectedSummaryId === election.id}
-					<div class="receipt-area" in:fade>
-						{#if receiptLoading}
-							<div class="receipt-loading">
-								<div class="mini-spinner"></div>
-								<span>Retrieving encrypted receipt…</span>
-							</div>
-						{:else if receiptData}
-							<div class="receipt-card" id="receipt-{election.id}">
-								<div class="receipt-header">
-									<div class="receipt-id-box">
-										<p class="label">Official Receipt ID</p>
-										<code class="val">{receiptData.receipt_id}</code>
-									</div>
-									<div class="receipt-actions">
-										<button class="receipt-icon-btn" onclick={() => navigator.clipboard.writeText(receiptData.receipt_id)} title="Copy ID">
-											<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
-										</button>
-										<button class="receipt-icon-btn" onclick={() => window.print()} title="Download PDF">
-											<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-										</button>
-									</div>
-								</div>
-								
-								<div class="receipt-votes-grid">
-									{#each receiptData.votes || [] as vote}
-										<div class="receipt-vote-item">
-											<span class="p-pos">{vote.position}</span>
-											<div class="p-cand">
-												<span class="p-name">{vote.candidates?.students?.full_name}</span>
-												<span class="p-party">{vote.candidates?.partylists?.name || 'Independent'}</span>
-											</div>
-										</div>
-									{/each}
-								</div>
-
-								<div class="receipt-footer-meta">
-									<p>Voter: {voterName}</p>
-									<p>Certified on {new Date(receiptData.voted_at).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })}</p>
-								</div>
-							</div>
-
-							<!-- Hidden Print-Only Version -->
-							<div class="print-only-receipt">
-								<div class="print-header">
-									<img src="/Messenger_creation_1261776042047231.jpeg" alt="UniVote" class="print-logo" />
-									<h1>OFFICIAL VOTING RECEIPT</h1>
-									<p class="print-sub">UNIVOTE DIGITAL ELECTION SYSTEM</p>
-								</div>
-								<div class="print-divider"></div>
-								<div class="print-meta-grid">
-									<div>
-										<span class="p-label">STUDENT NAME</span>
-										<p>{voterName}</p>
-									</div>
-									<div>
-										<span class="p-label">ELECTION</span>
-										<p>{election.name}</p>
-									</div>
-									<div>
-										<span class="p-label">RECEIPT ID</span>
-										<p class="mono">{receiptData.receipt_id}</p>
-									</div>
-									<div>
-										<span class="p-label">DATE CERTIFIED</span>
-										<p>{new Date(receiptData.voted_at).toLocaleString()}</p>
-									</div>
-								</div>
-								<div class="print-divider"></div>
-								<table class="print-table">
-									<thead>
-										<tr>
-											<th>POSITION</th>
-											<th>CANDIDATE</th>
-											<th>PARTYLIST</th>
-										</tr>
-									</thead>
-									<tbody>
-										{#each receiptData.votes || [] as vote}
-											<tr>
-												<td>{vote.position}</td>
-												<td>{vote.candidates?.students?.full_name}</td>
-												<td>{vote.candidates?.partylists?.name || 'Independent'}</td>
-											</tr>
-										{/each}
-									</tbody>
-								</table>
-								<div class="print-footer">
-									<p>This is a computer-generated document. No signature required.</p>
-									<p>© {new Date().getFullYear()} UniVote Student Council Election Services</p>
-								</div>
-							</div>
+					<div class="election-actions">
+						{#if election.has_voted}
+							<button class="btn-action btn-blue" onclick={() => toggleReceipt(election.id)}>
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+								{selectedSummaryId === election.id ? 'Hide Receipt' : 'View Receipt'}
+							</button>
+						{:else}
+							<a href="/student/ballot?election={election.id}" class="btn-action btn-blue" style="background:var(--accent);">
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+								Cast Vote
+							</a>
 						{/if}
+						<a href="/student/results?election={election.id}" class="btn-action btn-ghost">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+							View Results
+						</a>
 					</div>
-				{/if}
-			</div>
-		{/each}
+
+					{#if selectedSummaryId === election.id}
+						<div class="receipt-area" in:fade>
+							{#if receiptLoading}
+								<div class="receipt-loading">
+									<div class="mini-spinner"></div>
+									<span>Retrieving encrypted receipt…</span>
+								</div>
+							{:else if receiptData}
+								<div class="receipt-card" id="receipt-{election.id}">
+									<div class="receipt-header">
+										<div class="receipt-id-box">
+											<p class="label">Official Receipt ID</p>
+											<code class="val">{receiptData.receipt_id}</code>
+										</div>
+										<div class="receipt-actions">
+											<button class="receipt-icon-btn" onclick={() => navigator.clipboard.writeText(receiptData.receipt_id)} title="Copy ID">
+												<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+											</button>
+											<button class="receipt-icon-btn" onclick={() => window.print()} title="Download PDF">
+												<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+											</button>
+										</div>
+									</div>
+									
+									<div class="receipt-votes-grid">
+										{#each receiptData.votes || [] as vote}
+											<div class="receipt-vote-item">
+												<span class="p-pos">{vote.position}</span>
+												<div class="p-cand">
+													<span class="p-name">{vote.candidates?.students?.full_name}</span>
+													<span class="p-party">{vote.candidates?.partylists?.name || 'Independent'}</span>
+												</div>
+											</div>
+										{/each}
+									</div>
+
+									<div class="receipt-footer-meta">
+										<p>Voter: {voterName}</p>
+										<p>Certified on {new Date(receiptData.voted_at).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })}</p>
+									</div>
+								</div>
+
+								<!-- Hidden Print-Only Version -->
+								<div class="print-only-receipt">
+									<div class="print-header">
+										<img src="/Messenger_creation_1261776042047231.jpeg" alt="UniVote" class="print-logo" />
+										<h1>OFFICIAL VOTING RECEIPT</h1>
+										<p class="print-sub">UNIVOTE DIGITAL ELECTION SYSTEM</p>
+									</div>
+									<div class="print-divider"></div>
+									<div class="print-meta-grid">
+										<div>
+											<span class="p-label">STUDENT NAME</span>
+											<p>{voterName}</p>
+										</div>
+										<div>
+											<span class="p-label">ELECTION</span>
+											<p>{election.name}</p>
+										</div>
+										<div>
+											<span class="p-label">RECEIPT ID</span>
+											<p class="mono">{receiptData.receipt_id}</p>
+										</div>
+										<div>
+											<span class="p-label">DATE CERTIFIED</span>
+											<p>{new Date(receiptData.voted_at).toLocaleString()}</p>
+										</div>
+									</div>
+									<div class="print-divider"></div>
+									<table class="print-table">
+										<thead>
+											<tr>
+												<th>POSITION</th>
+												<th>CANDIDATE</th>
+												<th>PARTYLIST</th>
+											</tr>
+										</thead>
+										<tbody>
+											{#each receiptData.votes || [] as vote}
+												<tr>
+													<td>{vote.position}</td>
+													<td>{vote.candidates?.students?.full_name}</td>
+													<td>{vote.candidates?.partylists?.name || 'Independent'}</td>
+												</tr>
+											{/each}
+										</tbody>
+									</table>
+									<div class="print-footer">
+										<p>This is a computer-generated document. No signature required.</p>
+										<p>© {new Date().getFullYear()} UniVote Student Council Election Services</p>
+									</div>
+								</div>
+							{/if}
+						</div>
+					{/if}
+				</div>
+			{/each}
+		{/if}
 	</div>
+
+	{#if upcomingElections.length > 0}
+		<div class="section-row" style="margin-top: 40px;">
+			<h2 class="section-title">Upcoming Elections</h2>
+			<span class="active-pill" style="background:var(--amber-bg);color:var(--amber);opacity:0.8;">{upcomingElections.length} Scheduled</span>
+		</div>
+
+		<div class="elections-list">
+			{#each upcomingElections as election, idx}
+				<div class="election-item" in:fade={{ duration: 300, delay: idx * 80 }}>
+					<div class="election-main">
+						<div class="election-icon-bg" style="background:var(--amber-bg);color:var(--amber);">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+						</div>
+						<div class="election-info">
+							<div class="election-name-row">
+								<h3 class="election-name">{election.name}</h3>
+								<div class="voted-tag" style="background:var(--amber-bg);color:var(--amber);border-color:rgba(245,158,11,0.2);"><div class="dot" style="background:var(--amber);"></div>Upcoming</div>
+							</div>
+							<div class="election-meta">Starts {new Date(election.start_date || Date.now()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+						</div>
+					</div>
+
+					<div class="election-actions">
+						<button class="btn-action btn-ghost" disabled style="opacity:0.6; cursor:not-allowed;">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+							Coming Soon
+						</button>
+						<a href="/student/results?election={election.id}" class="btn-action btn-ghost">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+							Candidates Info
+						</a>
+					</div>
+				</div>
+			{/each}
+		</div>
+	{/if}
 {/if}
 
 <style>
+	.empty-state-mini { padding: 40px; text-align: center; background: var(--surface2); border: 1.5px dashed var(--border); border-radius: 20px; color: var(--muted); font-size: 14px; font-weight: 600; grid-column: 1 / -1; }
 	.loader-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 1rem; color: var(--muted); }
 	.spinner { width: 40px; height: 40px; border: 3px solid var(--surface2); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
 	@keyframes spin { to { transform: rotate(360deg); } }
 
 	.page-header { margin-bottom: 30px; }
+	@media (max-width: 768px) {
+		.page-header { gap: 0 !important; margin-bottom: 20px; }
+		.greeting { font-size: 32px !important; }
+	}
 	.breadcrumb { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent); font-weight: 800; margin-bottom: 8px; }
 	.greeting { font-size: 44px; font-weight: 800; color: var(--text); letter-spacing: -2px; line-height: 1.1; }
 

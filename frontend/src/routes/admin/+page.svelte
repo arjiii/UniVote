@@ -3,6 +3,7 @@
 	import { admin as adminApi } from '$lib/api.js';
 	import { goto } from '$app/navigation';
 	import { authSession } from '$lib/stores/auth.js';
+	import { branding } from '$lib/stores/branding.js';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 
 	/** @type {any[]} */
@@ -14,6 +15,13 @@
 	/** @type {any[]} */
 	let auditLogs = $state([]);
 	let isLoading = $state(true);
+
+	// Overlay state
+	let activeReport = $state(/** @type {string|null} */ (null)); // 'elections', 'voters', 'advisers', 'turnout'
+	let showOverlay = $state(false);
+
+	/** @type {any} */
+	let reportData = $state(null);
 
 	onMount(async () => {
 		try {
@@ -36,7 +44,7 @@
 
 	const activeElections = $derived(elections.filter((e) => e.status === 'active'));
 	const closedElections = $derived(
-		elections.filter((e) => e.status === 'ended' || e.status === 'closed')
+		elections.filter((e) => e.status === 'ended' || e.status === 'closed' || e.status === 'completed')
 	);
 	const votedCount = $derived(students.filter((s) => s.has_voted).length);
 	const notVotedCount = $derived(students.length - votedCount);
@@ -53,7 +61,7 @@
 	const activeDash = $derived(Math.round((activeShare / 100) * CIRC));
 
 	// Bar chart: last 7 stats based on audit log activity by day
-	const barData = $derived(() => {
+	const barData = $derived.by(() => {
 		const days = Array.from({ length: 7 }, (_, i) => {
 			const d = new Date();
 			d.setDate(d.getDate() - (6 - i));
@@ -65,14 +73,68 @@
 		}));
 	});
 
-	const barMax = $derived(Math.max(...barData().map((b) => b.value), 1));
+	const barMax = $derived(Math.max(...barData.map((b) => b.value), 1));
 
 	// Sparkline for elections (simple horizontal line + value)
 	const recentLogs = $derived(auditLogs.slice(0, 6));
 	const adminName = $derived($authSession?.full_name?.split(' ')[0] ?? 'Admin');
+
+	// Report Handlers
+	/** @param {'elections' | 'voters' | 'advisers' | 'turnout'} type */
+	function openReport(type) {
+		activeReport = type;
+		showOverlay = true;
+		
+		if (type === 'elections') {
+			reportData = {
+				title: 'Elections Report',
+				metrics: [
+					{ label: 'Pending Elections', value: elections.filter(e => e.status === 'upcoming').length, color: '#fda085' },
+					{ label: 'Active Elections', value: activeElections.length, color: '#68d391' },
+					{ label: 'Completed Elections', value: closedElections.length, color: '#a0aec0' }
+				]
+			};
+		} else if (type === 'voters' || type === 'turnout') {
+			// For voter status/turnout, the user wants "active election data"
+			const activeCount = activeElections.length;
+			if (activeCount === 0) {
+				reportData = {
+					title: type === 'voters' ? 'Voter Status Report' : 'Voter Turnout Report',
+					message: 'No active elections currently running.',
+					metrics: []
+				};
+			} else {
+				// Aggregate or show primary active election
+				// For now, use the global stats but contextually labeled
+				reportData = {
+					title: type === 'voters' ? 'Voter Status Report' : 'Voter Turnout Report',
+					subtitle: `Based on ${activeCount} active election(s)`,
+					metrics: [
+						{ label: 'Total Registered', value: students.length, color: '#4facfe' },
+						{ label: 'Voted', value: votedCount, color: '#68d391' },
+						{ label: 'Pending', value: notVotedCount, color: '#fda085' },
+						{ label: 'Turnout Percentage', value: turnoutPct + '%', color: '#0B75FE' }
+					]
+				};
+			}
+		} else if (type === 'advisers') {
+			reportData = {
+				title: 'Advisers Report',
+				metrics: [
+					{ label: 'Total Advisers', value: advisers.length, color: '#4facfe' },
+					{ label: 'Active Accounts', value: advisers.length, color: '#68d391' }
+				]
+			};
+		}
+	}
+
+	function closeOverlay() {
+		showOverlay = false;
+		setTimeout(() => { activeReport = null; reportData = null; }, 300);
+	}
 </script>
 
-<svelte:head><title>Dashboard | UniVote Admin</title></svelte:head>
+<svelte:head><title>Dashboard | {$branding.appName} Admin</title></svelte:head>
 
 <div class="dash">
 	<!-- ── PAGE HEADER ── -->
@@ -142,7 +204,7 @@
 					></div>
 				{/each}
 			</div>
-			<p class="kpi-sub">View report →</p>
+			<button onclick={() => openReport('elections')} class="kpi-sub">View report →</button>
 		</div>
 
 		<!-- Registered Voters card -->
@@ -180,7 +242,7 @@
 					></div>
 				{/each}
 			</div>
-			<p class="kpi-sub">View report →</p>
+			<button onclick={() => openReport('voters')} class="kpi-sub">View report →</button>
 		</div>
 
 		<!-- Advisers card -->
@@ -220,14 +282,14 @@
 					></div>
 				{/each}
 			</div>
-			<p class="kpi-sub">View report →</p>
+			<button onclick={() => openReport('advisers')} class="kpi-sub">View report →</button>
 		</div>
 
 		<!-- Turnout card -->
 		<div class="kpi-card">
 			<div class="kpi-top">
 				<div>
-					<p class="kpi-eyebrow">Voter Turnout</p>
+					<p class="kpi-eyebrow">Turnout</p>
 					{#if isLoading}
 						<div class="skeleton" style="width:3rem;height:2rem;"></div>
 					{:else}
@@ -258,7 +320,7 @@
 					></div>
 				{/each}
 			</div>
-			<p class="kpi-sub">View report →</p>
+			<button onclick={() => openReport('turnout')} class="kpi-sub">View report →</button>
 		</div>
 	</div>
 
@@ -269,7 +331,7 @@
 			<div class="card-header">
 				<p class="card-title">Weekly Activity</p>
 				<div style="display:flex;align-items:center;gap:1rem;">
-					<span class="legend-dot" style="background:#0B75FE;"></span><span class="legend-label"
+					<span class="legend-dot" style="background:var(--brand-primary, #0B75FE);"></span><span class="legend-label"
 						>This Week</span
 					>
 					<span class="legend-dot" style="background:#e2e8f0;"></span><span class="legend-label"
@@ -278,7 +340,7 @@
 				</div>
 			</div>
 			<div class="bar-chart-area">
-				{#each barData() as bar}
+				{#each barData as bar}
 					<div class="bc-col">
 						<div class="bc-track">
 							<div class="bc-bg-bar"></div>
@@ -303,7 +365,7 @@
 						cy="50"
 						r="40"
 						fill="none"
-						stroke="#0B75FE"
+						stroke="var(--brand-primary, #0B75FE)"
 						stroke-width="12"
 						stroke-dasharray="{voterDash} {CIRC - voterDash}"
 						stroke-dashoffset="63"
@@ -318,8 +380,8 @@
 			</div>
 			<div class="donut-legend">
 				<div class="dl-item">
-					<span class="dl-dot" style="background:#0B75FE;"></span><span class="dl-label">Voted</span
-					><span class="dl-val">{votedCount}</span>
+					<span class="dl-dot" style="background:var(--brand-primary, #0B75FE);"></span><span class="dl-label">Voted</span>
+					<span class="dl-val">{votedCount}</span>
 				</div>
 				<div class="dl-item">
 					<span class="dl-dot" style="background:#e2e8f0;"></span><span class="dl-label"
@@ -471,6 +533,48 @@
 			{/each}
 		</div>
 	</div>
+
+	<!-- ── REPORT OVERLAY ── -->
+	{#if showOverlay}
+		<div
+			class="overlay-backdrop"
+			onclick={closeOverlay}
+			onkeydown={(e) => e.key === 'Escape' && closeOverlay()}
+			role="button"
+			tabindex="0"
+		>
+			<div class="report-card" onclick={(e) => e.stopPropagation()} role="presentation">
+				<div class="rc-header">
+					<div>
+						<h2 class="rc-title">{reportData?.title}</h2>
+						{#if reportData?.subtitle}
+							<p class="rc-subtitle">{reportData.subtitle}</p>
+						{/if}
+					</div>
+					<button class="rc-close" onclick={closeOverlay}>×</button>
+				</div>
+
+				<div class="rc-content">
+					{#if reportData?.message}
+						<p class="rc-msg">{reportData.message}</p>
+					{:else}
+						<div class="rc-grid">
+							{#each reportData?.metrics ?? [] as m}
+								<div class="rc-item">
+									<p class="rc-label">{m.label}</p>
+									<p class="rc-value" style="color:{m.color};">{m.value}</p>
+								</div>
+							{/each}
+						</div>
+					{/if}
+				</div>
+
+				<div class="rc-footer">
+					<button class="rc-btn" onclick={closeOverlay}>Close Report</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -585,11 +689,137 @@
 		transition: height 0.4s ease;
 	}
 	.kpi-sub {
+		background: none;
+		border: none;
+		padding: 0;
+		text-align: left;
+		font-family: inherit;
 		font-size: 0.6875rem;
 		font-weight: 600;
 		color: var(--brand-primary);
 		cursor: pointer;
 		margin: 0;
+	}
+
+	/* ── Overlay Styles ── */
+	.overlay-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.4);
+		backdrop-filter: blur(4px);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1000;
+		animation: fadeIn 0.3s ease;
+	}
+
+	.report-card {
+		background: var(--bg-card);
+		border: 1px solid var(--border-main);
+		border-radius: 24px;
+		width: 90%;
+		max-width: 500px;
+		box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+		padding: 2rem;
+		animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+		position: relative;
+	}
+
+	.rc-header {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		margin-bottom: 1.5rem;
+	}
+	.rc-title {
+		font-size: 1.5rem;
+		font-weight: 800;
+		color: var(--text-main);
+		margin: 0;
+		letter-spacing: -0.02em;
+	}
+	.rc-subtitle {
+		font-size: 0.8125rem;
+		color: var(--text-subtle);
+		margin: 0.25rem 0 0;
+	}
+	.rc-close {
+		background: var(--bg-elevated);
+		border: none;
+		color: var(--text-main);
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 1.25rem;
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+	.rc-close:hover {
+		background: #ff4d4d;
+		color: #fff;
+	}
+
+	.rc-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1.25rem;
+	}
+	.rc-item {
+		background: var(--bg-elevated);
+		padding: 1.25rem;
+		border-radius: 16px;
+		border: 1px solid var(--border-subtle);
+	}
+	.rc-label {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--text-subtle);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin: 0 0 0.5rem;
+	}
+	.rc-value {
+		font-size: 1.5rem;
+		font-weight: 800;
+		margin: 0;
+	}
+	.rc-msg {
+		text-align: center;
+		color: var(--text-subtle);
+		padding: 2rem 0;
+	}
+
+	.rc-footer {
+		margin-top: 2rem;
+		display: flex;
+		justify-content: flex-end;
+	}
+	.rc-btn {
+		background: var(--brand-gradient);
+		color: #fff;
+		border: none;
+		padding: 0.75rem 1.5rem;
+		border-radius: 12px;
+		font-weight: 700;
+		cursor: pointer;
+		box-shadow: 0 4px 12px rgba(11, 117, 254, 0.3);
+		transition: transform 0.2s;
+	}
+	.rc-btn:hover {
+		transform: translateY(-2px);
+	}
+
+	@keyframes fadeIn {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
+	@keyframes slideUp {
+		from { opacity: 0; transform: translateY(20px) scale(0.95); }
+		to { opacity: 1; transform: translateY(0) scale(1); }
 	}
 
 	/* ── Middle Row ── */
@@ -672,10 +902,10 @@
 		position: relative;
 		width: 100%;
 		border-radius: 6px;
-		background: linear-gradient(to top, #0b75fe, #00d2ff);
+		background: linear-gradient(to top, var(--brand-primary, #0b75fe), var(--brand-secondary, #00d2ff));
 		transition: height 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
 		min-height: 6px;
-		box-shadow: 0 -2px 12px rgba(11, 117, 254, 0.3);
+		box-shadow: 0 -2px 12px var(--brand-glow, rgba(11, 117, 254, 0.3));
 	}
 	.bc-label {
 		font-size: 0.625rem;
@@ -802,8 +1032,8 @@
 		color: #d97706;
 	}
 	.av-adviser {
-		background: #e6f0ff;
-		color: #0b75fe;
+		background: var(--brand-primary-light, #e6f0ff);
+		color: var(--brand-primary, #0b75fe);
 	}
 	.act-name {
 		font-size: 0.75rem;
@@ -832,8 +1062,8 @@
 		color: #d97706;
 	}
 	.rt-adviser {
-		background: #e6f0ff;
-		color: #0b75fe;
+		background: var(--brand-primary-light, #e6f0ff);
+		color: var(--brand-primary, #0b75fe);
 	}
 
 	/* ── Quick Nav ── */

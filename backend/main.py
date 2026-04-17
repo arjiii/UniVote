@@ -26,13 +26,36 @@ from routes import (
     student,
     auth as auth_router,
     results as results_router,
+    common as common_router,
 )
 
 from config import ALLOWED_ORIGINS
 
 
+import asyncio
+from services.election_service import auto_transition_status
+
 app = FastAPI(title="UniVote API")
 app.state.limiter = limiter
+
+async def run_election_scheduler():
+    """Background task to automatically start/end elections based on schedule."""
+    print("[Scheduler] Starting election status scheduler...")
+    while True:
+        try:
+            summary = await auto_transition_status()
+            if summary["started"] > 0 or summary["ended"] > 0:
+                print(f"[Scheduler] Processed: {summary['started']} started, {summary['ended']} ended.")
+        except Exception as e:
+            print(f"[Scheduler] Error in auto-transition: {e}")
+        
+        # Run every 60 seconds
+        await asyncio.sleep(60)
+
+@app.on_event("startup")
+async def startup_event():
+    # Start the background scheduler
+    asyncio.create_task(run_election_scheduler())
 
 
 def rate_limit_handler(request: Request, exc: RateLimitExceeded):
@@ -102,6 +125,7 @@ app.include_router(student.router, prefix="/api/student", tags=["student"])
 # Protected: admin and adviser routes require a valid Supabase JWT
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(adviser.router, prefix="/api/adviser", tags=["adviser"])
+app.include_router(common_router.router, prefix="/api/common", tags=["common"])
 
 
 @app.get("/")

@@ -1,16 +1,28 @@
 <script>
 	import { onMount } from 'svelte';
 	import { admin as adminApi } from '$lib/api.js';
+	import { branding } from '$lib/stores/branding.js';
 	import Notification from '$lib/components/Notification.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
+	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
 
 	/** @type {Array<any>} */
 	let elections = $state([]);
 	let isLoading = $state(true);
+	let electionSearch = $state('');
 	let newElection = $state({ name: '', start_date: '', end_date: '', description: '' });
 	let isCreating = $state(false);
 	let showForm = $state(false);
 	let editingElectionId = $state(/** @type {string|null} */ (null));
+
+	// Confirmation Modal State
+	let confirmState = $state({
+		show: false,
+		title: '',
+		message: '',
+		onConfirm: () => {},
+		id: ''
+	});
 
 	/** @type {{ text: string, type: 'info' | 'success' | 'error' }} */
 	let notification = $state({ text: '', type: 'info' });
@@ -29,6 +41,12 @@
 			isLoading = false;
 		}
 	}
+
+	const filteredElections = $derived(
+		electionSearch
+			? elections.filter((e) => e.name.toLowerCase().includes(electionSearch.toLowerCase()))
+			: elections
+	);
 
 	function notify(text = '', type = /** @type {'info' | 'success' | 'error'} */ ('info')) {
 		notification = { text, type };
@@ -113,15 +131,24 @@
 		}
 	}
 
-	async function deleteElection(/** @type {string} */ id) {
-		if (!confirm('Delete this election and all its data permanently?')) return;
-		try {
-			await adminApi.deleteElection(id);
-			elections = elections.filter((e) => e.id !== id);
-			notify('Election deleted', 'success');
-		} catch (/** @type {any} */ err) {
-			notify(err.message ?? 'Failed to delete election', 'error');
-		}
+	function promptDelete(/** @type {any} */ election) {
+		confirmState = {
+			show: true,
+			title: 'Delete Election',
+			message: `Are you sure you want to delete "${election.name}"? This will permanently remove all associated candidates and votes.`,
+			id: election.id,
+			onConfirm: async () => {
+				try {
+					await adminApi.deleteElection(confirmState.id);
+					elections = elections.filter((e) => e.id !== confirmState.id);
+					notify('Election deleted', 'success');
+				} catch (/** @type {any} */ err) {
+					notify(err.message ?? 'Failed to delete election', 'error');
+				} finally {
+					confirmState.show = false;
+				}
+			}
+		};
 	}
 
 	function toggleLabel(/** @type {string} */ status) {
@@ -136,7 +163,7 @@
 	}
 </script>
 
-<svelte:head><title>Elections | UniVote Admin</title></svelte:head>
+<svelte:head><title>Elections | {$branding.appName}</title></svelte:head>
 
 <div class="dash">
 	<div class="dash-header">
@@ -145,6 +172,27 @@
 			<h1 class="dash-title">Election Management</h1>
 		</div>
 		<div style="display:flex;gap:0.5rem;align-items:center;">
+			<!-- Search -->
+			<div style="position:relative;">
+				<svg
+					style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);width:0.875rem;height:0.875rem;color:var(--text-subtle);opacity:0.6;"
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+					><path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2.5"
+						d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+					/></svg
+				>
+				<input
+					bind:value={electionSearch}
+					placeholder="Search elections…"
+					class="input-base"
+					style="padding-left:2.5rem;width:240px;height:2rem;font-size:0.75rem;font-family:sans-serif;"
+				/>
+			</div>
 			<button onclick={loadElections} class="btn-secondary btn-sm">
 				<svg
 					class="h-3.5 w-3.5"
@@ -250,7 +298,7 @@
 		<div
 			style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-main);display:flex;align-items:center;justify-content:space-between;"
 		>
-			<p class="section-label">{elections.length} Election{elections.length !== 1 ? 's' : ''}</p>
+			<p class="section-label">{filteredElections.length} Election{filteredElections.length !== 1 ? 's' : ''}</p>
 		</div>
 
 		{#if isLoading}
@@ -259,8 +307,10 @@
 					<div class="skeleton" style="height:3rem;"></div>
 				{/each}
 			</div>
-		{:else if elections.length === 0}
-			<div class="empty-state">No elections yet. Click "New Election" to create one.</div>
+		{:else if filteredElections.length === 0}
+			<div class="empty-state">
+				{electionSearch ? 'No elections match your search.' : 'No elections yet. Click "New Election" to create one.'}
+			</div>
 		{:else}
 			<div style="overflow-x:auto;">
 				<table class="data-table">
@@ -276,7 +326,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each elections as election (election.id)}
+						{#each filteredElections as election (election.id)}
 							<tr>
 								<td
 									style="font-weight:600;color:var(--text-main);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
@@ -328,7 +378,7 @@
 										{/if}
 									{/if}
 									<button
-										onclick={() => deleteElection(election.id)}
+										onclick={() => promptDelete(election)}
 										class="btn-icon-danger"
 										title="Delete election"
 										style="margin-left:0.25rem;"
@@ -359,3 +409,11 @@
 <div style="position:fixed;bottom:1.5rem;right:1.5rem;z-index:110;">
 	<Notification text={notification.text} type={notification.type} />
 </div>
+
+<ConfirmModal
+	show={confirmState.show}
+	title={confirmState.title}
+	message={confirmState.message}
+	onConfirm={confirmState.onConfirm}
+	onCancel={() => (confirmState.show = false)}
+/>

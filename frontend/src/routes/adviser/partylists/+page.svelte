@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import { admin, adviser } from '$lib/api.js';
 	import { selectedElectionId } from '$lib/stores/election.js';
+	import { branding } from '$lib/stores/branding.js';
+	import GlassCard from '$lib/components/GlassCard.svelte';
 
 	/** @type {any[]} */
 	let elections = $state([]);
@@ -117,7 +119,7 @@
 	}
 </script>
 
-<svelte:head><title>Partylist Configuration | UniVote</title></svelte:head>
+<svelte:head><title>Partylists | {$branding.appName}</title></svelte:head>
 
 <div class="dash">
 	<div class="dash-header">
@@ -133,7 +135,7 @@
 				id="election-select"
 				bind:value={$selectedElectionId}
 				class="input-base"
-				style="width:220px;padding:0.375rem 0.75rem;font-size:0.8125rem;"
+				style="min-width:200px; width:auto; max-width:450px; padding:0.375rem 0.75rem; font-size:0.8125rem;"
 			>
 				<option value="" disabled>Select Election...</option>
 				{#each elections as election}

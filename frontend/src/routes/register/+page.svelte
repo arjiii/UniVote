@@ -4,6 +4,7 @@
 	import { auth as authApi } from '$lib/api.js';
 	import { authSession } from '$lib/stores/auth.js';
 	import { theme, toggleTheme } from '$lib/stores/theme.js';
+	import { branding } from '$lib/stores/branding.js';
 	import GlassCard from '$lib/components/GlassCard.svelte';
 	import { fade, fly } from 'svelte/transition';
 
@@ -36,22 +37,20 @@
 	}
 </script>
 
-<svelte:head><title>Register | UniVote Staff Portal</title></svelte:head>
+<svelte:head><title>Register | {$branding.appName} Staff Portal</title></svelte:head>
 
 <div class="auth-page">
-	<div class="sphere sphere-1"></div>
-	<div class="sphere sphere-2"></div>
-	<div class="sphere sphere-3"></div>
-	<div class="sphere sphere-4"></div>
+
 
 	<!-- Desktop card -->
 	<div class="auth-card">
 		<div class="auth-left">
+
 			<div class="auth-brand">
 				<button onclick={toggleTheme} class="auth-logo-btn">
-					<img src="/Messenger_creation_1261776042047231.jpeg" alt="UniVote Logo" class="auth-logo" />
+					<img src={$branding.logoUrl || "/Messenger_creation_1261776042047231.jpeg"} alt="{$branding.appName} Logo" class="auth-logo" />
 				</button>
-				<span class="auth-brand-name">UNIVOTE</span>
+				<span class="auth-brand-name">{$branding.appName.toUpperCase()}</span>
 			</div>
 
 			<div class="auth-hero">
@@ -73,7 +72,7 @@
 				</div>
 			</div>
 
-			<p class="auth-footer-text">© 2025 UNIVOTE</p>
+			<p class="auth-footer-text">© 2025 {$branding.appName.toUpperCase()}</p>
 		</div>
 
 		<div class="auth-right auth-right-scroll">
@@ -157,9 +156,9 @@
 	<div class="auth-mobile">
 		<div class="auth-mobile-header">
 			<button onclick={toggleTheme} class="auth-logo-btn auth-logo-btn-mobile">
-				<img src="/Messenger_creation_1261776042047231.jpeg" alt="UniVote Logo" class="auth-logo auth-logo-lg" />
+				<img src={$branding.logoUrl || "/Messenger_creation_1261776042047231.jpeg"} alt="{$branding.appName} Logo" class="auth-logo auth-logo-lg" />
 			</button>
-			<h1 class="auth-mobile-title">UNIVOTE</h1>
+			<h1 class="auth-mobile-title">{$branding.appName.toUpperCase()}</h1>
 			<p class="auth-mobile-sub">STAFF REGISTRATION</p>
 		</div>
 
@@ -228,12 +227,12 @@
 			</div>
 		</div>
 
-		<p class="auth-mobile-copyright">© 2025 UNIVOTE</p>
+		<p class="auth-mobile-copyright">© 2025 {$branding.appName.toUpperCase()}</p>
 	</div>
 </div>
 
 <style>
-	.auth-page { position: relative; min-height: 100vh; background: linear-gradient(135deg, #0b75fe 0%, #0052cc 50%, #003d99 100%); overflow: hidden; }
+	.auth-page { position: relative; min-height: 100vh; background: linear-gradient(135deg, var(--brand-primary, #0b75fe) 0%, var(--brand-primary-hover, #0052cc) 50%, var(--brand-secondary, #003d99) 100%); overflow: hidden; }
 
 	.auth-card { display: none; position: relative; z-index: 2; width: 90%; max-width: 1100px; min-height: 600px; margin: auto; border-radius: 20px; overflow: hidden; box-shadow: 0 25px 80px rgba(0,0,0,0.25); }
 	@media (min-width: 1024px) { .auth-page { display: flex; align-items: center; justify-content: center; } .auth-card { display: flex; } .auth-mobile { display: none !important; } }
@@ -261,7 +260,7 @@
 	:global(.dark) .auth-right { background: var(--bg-card); }
 
 	.accent-sphere { position: absolute; border-radius: 50%; pointer-events: none; z-index: 0; }
-	.accent-sphere-br { width: 160px; height: 160px; bottom: -50px; right: -50px; background: radial-gradient(circle at 35% 35%, rgba(11,117,254,0.2), rgba(0,82,204,0.5) 60%, rgba(0,50,140,0.7)); box-shadow: inset -4px -4px 10px rgba(0,0,0,0.2); animation: sphereBob2 14s ease-in-out infinite; }
+	.accent-sphere-br { width: 160px; height: 160px; bottom: -50px; right: -50px; background: radial-gradient(circle at 35% 35%, var(--brand-primary-light, rgba(11,117,254,0.2)), var(--brand-primary, rgba(0,82,204,0.5)) 60%, var(--brand-secondary, rgba(0,50,140,0.7))); box-shadow: inset -4px -4px 10px rgba(0,0,0,0.2); animation: sphereBob2 14s ease-in-out infinite; }
 
 	.auth-form-container { position: relative; z-index: 1; width: 100%; max-width: 380px; }
 	.auth-form-container-wide { max-width: 440px; }
@@ -279,7 +278,7 @@
 	.auth-field { display: flex; flex-direction: column; gap: 0.35rem; }
 	.auth-field-full { grid-column: 1 / -1; }
 
-	.auth-btn-primary { width: 100%; padding: 0.875rem; background: linear-gradient(135deg, #1a1a2e, #16213e); color: white; border: none; border-radius: 10px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.2em; cursor: pointer; transition: all 0.2s; text-transform: uppercase; }
+	.auth-btn-primary { width: 100%; padding: 0.875rem; background: linear-gradient(135deg, var(--brand-primary, #1a1a2e), var(--brand-primary-hover, #16213e)); color: white; border: none; border-radius: 10px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.2em; cursor: pointer; transition: all 0.2s; text-transform: uppercase; }
 	.auth-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.2); }
 	.auth-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
@@ -294,15 +293,7 @@
 	.form-link { font-size: 0.55rem; font-weight: 700; letter-spacing: 0.15em; color: var(--text-subtle); text-decoration: none; text-transform: uppercase; transition: color 0.2s; }
 	.form-link:hover { color: var(--text-main); }
 
-	.sphere { position: absolute; border-radius: 50%; z-index: 1; }
-	.sphere-1 { width: 320px; height: 320px; bottom: -80px; left: -60px; background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15), rgba(0,82,204,0.5) 50%, rgba(0,40,120,0.8)); box-shadow: inset -10px -10px 30px rgba(0,0,0,0.3), 0 25px 80px rgba(0,0,0,0.15); animation: sphereBob1 10s ease-in-out infinite; }
-	.sphere-2 { width: 140px; height: 140px; top: 40px; right: 8%; background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2), rgba(0,100,230,0.4) 60%, rgba(0,60,160,0.6)); box-shadow: inset -5px -5px 15px rgba(0,0,0,0.2), 0 15px 40px rgba(0,0,0,0.1); animation: sphereBob2 12s ease-in-out infinite; }
-	.sphere-3 { width: 70px; height: 70px; top: 60%; left: 35%; background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.25), rgba(0,120,255,0.3) 70%); box-shadow: inset -3px -3px 8px rgba(0,0,0,0.15); animation: sphereBob3 14s ease-in-out infinite; }
-	.sphere-4 { width: 45px; height: 45px; top: 20%; left: 30%; background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3), rgba(0,100,220,0.25) 70%); animation: sphereBob2 16s ease-in-out infinite reverse; }
 
-	@keyframes sphereBob1 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(15px, -25px); } }
-	@keyframes sphereBob2 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-12px, 18px) scale(1.06); } }
-	@keyframes sphereBob3 { 0%, 100% { transform: translate(0, 0); } 33% { transform: translate(12px, -12px); } 66% { transform: translate(-8px, 10px); } }
 
 	.auth-mobile { display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 2rem 1.25rem; z-index: 2; position: relative; }
 	@media (min-width: 1024px) { .auth-mobile { display: none; } }

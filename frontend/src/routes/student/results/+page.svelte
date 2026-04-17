@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { student as studentApi } from '$lib/api.js';
 	import { voterSession } from '$lib/stores/session.js';
+	import { branding } from '$lib/stores/branding.js';
 	import { page } from '$app/state';
 	import { fade, fly, scale } from 'svelte/transition';
 	import { sortPositions, calculateWinners } from '$lib/constants.js';
@@ -17,6 +18,7 @@
 	let candidates = $state([]);
 	let electionId = $state('');
 	let lastUpdated = $state('');
+	let statusMessage = $state('');
 	let currentTime = $state(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
 	/** @type {any[]} */
@@ -96,6 +98,7 @@
 			]);
 			const fetched = resData.data || {};
 			results = fetched.tallies || fetched;
+			statusMessage = fetched.message || '';
 			candidates = candData.data || [];
 			lastUpdated = new Date().toLocaleTimeString();
 		} catch (err) {
@@ -142,11 +145,11 @@
 	}
 </script>
 
-<svelte:head><title>Election Results | UniVote</title></svelte:head>
+<svelte:head><title>Election Results | {$branding.appName}</title></svelte:head>
 
 <div class="results-container">
 	<div class="page-header">
-		<div class="breadcrumb">OFFICIAL RESULTS & TALLY</div>
+		<div class="breadcrumb">PAGES / ELECTION RESULTS</div>
 		
 		<div class="header-row">
 			<h1 class="page-title">Election Outcomes</h1>
@@ -174,13 +177,17 @@
 			<div class="spinner"></div>
 			<p>Syncing Cryptographic Data…</p>
 		</div>
-	{:else if electionId && positions.length === 0}
+	{:else if electionId && (positions.length === 0 || statusMessage)}
 		<div class="empty-results-hero" in:scale={{ start: 0.95, duration: 400 }}>
-			<div class="hero-icon-ring">
-				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+			<div class="hero-icon-ring" style="color: {statusMessage ? 'var(--amber)' : 'var(--accent)'};">
+				{#if statusMessage}
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+				{:else}
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+				{/if}
 			</div>
-			<h2 class="hero-title">Awaiting Live Feed</h2>
-			<p class="hero-body">Cryptographic tallies will appear here automatically as verifyable ballots are submitted. No data available for this session yet.</p>
+			<h2 class="hero-title">{statusMessage ? 'Access Restricted' : 'Awaiting Live Feed'}</h2>
+			<p class="hero-body">{statusMessage || 'Cryptographic tallies will appear here automatically as verifyable ballots are submitted. No data available for this session yet.'}</p>
 		</div>
 	{:else if !electionId}
 		<div class="empty-results-hero" in:scale={{ start: 0.95, duration: 400 }}>
@@ -256,7 +263,7 @@
 	.live-pill { background: var(--green-bg); border: 1px solid rgba(16, 185, 129, 0.2); padding: 7px 16px; border-radius: 20px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 	.live-indicator { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
 	@keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.4); } 100% { opacity: 1; transform: scale(1); } }
-	.live-time { font-size: 13px; font-weight: 800; color: var(--green); }
+	.live-time { font-size: 13px; font-weight: 800; color: var(--status-success-fg); }
 
 	/* EMPTY HERO */
 	.empty-results-hero { background: var(--surface); border: 1.5px solid var(--border); border-radius: 32px; padding: 100px 40px; text-align: center; max-width: 600px; margin-top: 40px; }
@@ -285,7 +292,7 @@
 	.cand-row { display: flex; flex-direction: column; gap: 8px; }
 	.cand-info { display: flex; align-items: center; gap: 14px; }
 	.cand-avatar { width: 44px; height: 44px; border-radius: 50%; background: #475569; color: white; display: grid; place-items: center; font-size: 14px; font-weight: 800; flex-shrink: 0; }
-	.cand-avatar.winner { background: var(--accent); }
+	.cand-avatar.winner { background: var(--brand-primary, var(--accent)); }
 	.cand-text { flex: 1; min-width: 0; }
 	.cand-name { font-size: 16px; font-weight: 800; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.cand-party { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
@@ -297,7 +304,7 @@
 
 	.progress-container { width: 100%; height: 6px; background: var(--bg); border-radius: 10px; overflow: hidden; }
 	.progress-bar { height: 100%; border-radius: 10px; background: #94a3b8; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); }
-	.progress-bar.winner { background: var(--accent); }
+	.progress-bar.winner { background: var(--brand-primary, var(--accent)); }
 
 
 	@media (max-width: 768px) {

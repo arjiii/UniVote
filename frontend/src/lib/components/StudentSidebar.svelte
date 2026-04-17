@@ -4,6 +4,7 @@
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import { voterSession } from '$lib/stores/session.js';
+	import { branding } from '$lib/stores/branding.js';
 
 	/** @type {{ student_info?: any }} */
 	let { student_info } = $props();
@@ -26,7 +27,7 @@
 
 	function handleLogout() {
 		voterSession.logout();
-		goto('/');
+		goto('/student/validate');
 	}
 
 	const initials = $derived(
@@ -52,6 +53,11 @@
 			name: 'Results',
 			path: '/student/results',
 			icon: 'M18 20V10M12 20V4M6 20v-6'
+		},
+		{
+			name: 'Profile',
+			path: '/student/profile',
+			icon: 'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'
 		}
 	];
 </script>
@@ -71,13 +77,19 @@
 		</svg>
 	</button>
 
-	<div class="sb-logo">
-		<img src="/Messenger_creation_1261776042047231.jpeg" alt="UniVote Logo" class="sb-logo-img" />
-		<span class="sb-logo-text">UniVote</span>
-	</div>
+	<a href="/student" class="sb-logo" style="text-decoration: none;">
+		<img src={$branding.logoUrl || "/Messenger_creation_1261776042047231.jpeg"} alt="{$branding.appName} Logo" class="sb-logo-img" />
+		<span class="sb-logo-text">{$branding.appName}</span>
+	</a>
 
 	<div class="sb-user-card">
-		<div class="sb-avatar">{initials}</div>
+		<div class="sb-avatar">
+			{#if student_info?.photo_url}
+				<img src={student_info.photo_url} alt={student_info.full_name} class="sb-avatar-img" />
+			{:else}
+				{initials}
+			{/if}
+		</div>
 		<div class="sb-uinfo">
 			<div class="name">{student_info?.full_name || 'Voter Session'}</div>
 			<div class="role">STUDENT</div>
@@ -227,6 +239,12 @@
 			font-size: 14px;
 			color: #fff;
 			box-shadow: 0 4px 12px rgba(92, 96, 245, 0.2);
+			overflow: hidden;
+		}
+		.sb-avatar-img {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
 		}
 		.sb-uinfo {
 			flex: 1;

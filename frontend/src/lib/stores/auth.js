@@ -7,6 +7,8 @@ import { browser } from '$app/environment';
  * @property {string} role
  * @property {string} full_name
  * @property {string} user_id
+ * @property {string} [photo_url]
+ * @property {boolean} [must_change_password]
  */
 
 function createAuthStore() {

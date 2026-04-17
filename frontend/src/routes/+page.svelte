@@ -4,6 +4,7 @@
 	import { authSession } from '$lib/stores/auth.js';
 	import { voterSession } from '$lib/stores/session.js';
 	import { toggleTheme } from '$lib/stores/theme.js';
+	import { branding } from '$lib/stores/branding.js';
 
 	onMount(() => {
 		if ($authSession) goto($authSession.role === 'admin' ? '/admin' : '/adviser');
@@ -12,15 +13,19 @@
 </script>
 
 <svelte:head>
-	<title>UniVote — School Election System</title>
+	<title>{$branding.appName} — School Election System</title>
 </svelte:head>
 
 <div class="landing">
-	<!-- Decorative spheres -->
-	<div class="sphere sphere-1"></div>
-	<div class="sphere sphere-2"></div>
-	<div class="sphere sphere-3"></div>
-	<div class="sphere sphere-4"></div>
+	<!-- Decorative floating voting icons -->
+	<svg class="floating-icon floating-icon-xl" style="bottom: -100px; left: -80px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.5"><path d="M19 11V9a2 2 0 00-2-2H5a2 2 0 00-2 2v2m0 0a2 2 0 012 2h12a2 2 0 012-2M3 11v10h18V11M12 11v10m-3-6h6"/></svg>
+	<svg class="floating-icon floating-icon-lg" style="top: 5%; right: 10%; animation-delay: -3s; opacity: 0.05;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+	<svg class="floating-icon floating-icon-md" style="top: 45%; left: 40%; animation-delay: -7s;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+	<svg class="floating-icon floating-icon-sm" style="top: 15%; left: 20%; animation-delay: -10s; opacity: 0.06;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m12-9a4 4 0 11-8 0 4 4 0 018 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zm-2 4v-1a3 3 0 00-3-3h-1m1.5-9a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+	<svg class="floating-icon floating-icon-xs" style="bottom: 20%; right: 15%; animation-delay: -4s;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 00-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+	<svg class="floating-icon floating-icon-lg" style="top: 80%; right: 35%; animation-delay: -15s; opacity: 0.04;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg>
+	<svg class="floating-icon floating-icon-md" style="top: 30%; right: 45%; animation-delay: -8s; opacity: 0.05;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M19 11V9a2 2 0 00-2-2H5a2 2 0 00-2 2v2m0 0a2 2 0 012 2h12a2 2 0 012-2M3 11v10h18V11M12 11v10m-3-6h6"/></svg>
+	<svg class="floating-icon floating-icon-sm" style="bottom: 5%; left: 40%; animation-delay: -5s;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
 
 	<!-- Topbar -->
 	<nav class="topbar">
@@ -32,12 +37,12 @@
 					title="Toggle theme"
 				>
 					<img
-						src="/Messenger_creation_1261776042047231.jpeg"
-						alt="UniVote Logo"
+						src={$branding.logoUrl || '/Messenger_creation_1261776042047231.jpeg'}
+						alt="{$branding.appName} Logo"
 						style="width: 32px; height: 32px; object-fit: contain; border-radius: 6px;"
 					/>
 				</button>
-				<span class="logo-text">UniVote</span>
+				<span class="logo-text">{$branding.appName}</span>
 				<span class="logo-divider">|</span>
 				<span class="logo-sub">School Election System</span>
 			</div>
@@ -141,7 +146,7 @@
 							Live turnout monitoring
 						</div>
 					</div>
-					<div class="entry-action btn-secondary" style="margin-top:auto;">
+					<div class="entry-action btn-primary" style="margin-top:auto;">
 						Staff Login
 						<svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
 							><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
@@ -153,7 +158,7 @@
 
 	<!-- Footer -->
 	<footer class="landing-footer">
-		<span>© 2025 UniVote</span>
+		<span>© 2025 {$branding.appName}</span>
 		<span class="footer-sep">·</span>
 		<span>Secure · Transparent · Official</span>
 	</footer>
@@ -161,7 +166,7 @@
 
 <style>
 	:global(body) {
-		background: linear-gradient(135deg, #0b75fe 0%, #0052cc 50%, #003d99 100%);
+		background: linear-gradient(135deg, var(--brand-primary, #0b75fe) 0%, var(--brand-primary-hover, #0052cc) 50%, var(--brand-secondary, #003d99) 100%);
 	}
 
 	.landing {
@@ -170,37 +175,7 @@
 		flex-direction: column;
 		position: relative;
 		overflow: hidden;
-		background: linear-gradient(135deg, #0b75fe 0%, #0052cc 50%, #003d99 100%);
-	}
-
-	/* ====== SPHERES ====== */
-	.sphere { position: absolute; border-radius: 50%; z-index: 0; pointer-events: none; }
-	.sphere-1 {
-		width: 420px; height: 420px;
-		bottom: -120px; left: -80px;
-		background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15), rgba(0,82,204,0.5) 50%, rgba(0,40,120,0.8));
-		box-shadow: inset -10px -10px 30px rgba(0,0,0,0.3), 0 25px 80px rgba(0,0,0,0.15);
-		animation: sphereBob1 10s ease-in-out infinite;
-	}
-	.sphere-2 {
-		width: 180px; height: 180px;
-		top: 30px; right: 6%;
-		background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2), rgba(0,100,230,0.4) 60%, rgba(0,60,160,0.6));
-		box-shadow: inset -5px -5px 15px rgba(0,0,0,0.2), 0 15px 40px rgba(0,0,0,0.1);
-		animation: sphereBob2 12s ease-in-out infinite;
-	}
-	.sphere-3 {
-		width: 90px; height: 90px;
-		top: 55%; left: 40%;
-		background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.25), rgba(0,120,255,0.3) 70%);
-		box-shadow: inset -3px -3px 8px rgba(0,0,0,0.15);
-		animation: sphereBob3 14s ease-in-out infinite;
-	}
-	.sphere-4 {
-		width: 55px; height: 55px;
-		top: 15%; left: 25%;
-		background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3), rgba(0,100,220,0.25) 70%);
-		animation: sphereBob2 16s ease-in-out infinite reverse;
+		background: linear-gradient(135deg, var(--brand-primary, #0b75fe) 0%, var(--brand-primary-hover, #0052cc) 50%, var(--brand-secondary, #003d99) 100%);
 	}
 
 	@keyframes sphereBob1 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(15px, -25px); } }
@@ -212,7 +187,7 @@
 		position: sticky;
 		top: 0;
 		z-index: 50;
-		background: rgba(0, 60, 160, 0.35);
+		background: var(--brand-primary-light, rgba(0, 60, 160, 0.35));
 		backdrop-filter: blur(16px);
 		-webkit-backdrop-filter: blur(16px);
 		border-bottom: 1px solid rgba(255, 255, 255, 0.12);
@@ -337,8 +312,8 @@
 		justify-content: center;
 	}
 	.entry-icon-primary {
-		background-color: rgba(37, 99, 235, 0.12);
-		color: #2563eb;
+		background-color: var(--brand-primary-light, rgba(37, 99, 235, 0.12));
+		color: var(--brand-primary, #2563eb);
 	}
 	.entry-icon-neutral {
 		background-color: #f1f5f9;

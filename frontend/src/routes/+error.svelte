@@ -1,5 +1,6 @@
 <script>
 	import { page } from '$app/state';
+	import { branding } from '$lib/stores/branding.js';
 	import favicon from '$lib/assets/favicon.svg';
 
 	/** @type {Record<number, { title: string, subtitle: string, icon: string }>} */
@@ -29,14 +30,14 @@
 </script>
 
 <svelte:head>
-	<title>{status} | UniVote Error</title>
+	<title>{status} | {$branding.appName} Error</title>
 </svelte:head>
 
 <div class="flex min-h-screen items-center justify-center bg-surface-main p-6 font-sans">
 	<div class="animate-in fade-in zoom-in w-full max-w-md space-y-8 text-center duration-700">
 		<!-- Brand Header -->
 		<div class="mb-8 flex justify-center">
-			<img src={favicon} alt="UniVote Logo" class="h-12 w-12 opacity-50 grayscale" />
+			<img src={$branding.logoUrl || favicon} alt="{$branding.appName} Logo" class="h-12 w-12 opacity-50 grayscale" />
 		</div>
 
 		<!-- Main Error Content -->
@@ -114,7 +115,7 @@
 		<!-- System Footer -->
 		<div class="pt-4">
 			<p class="text-[10px] font-black tracking-widest text-content-subtle uppercase">
-				UniVote Automated Recovery Service • v0.0.1
+				{$branding.appName} Automated Recovery Service • v0.0.1
 			</p>
 		</div>
 	</div>
