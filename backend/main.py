@@ -107,7 +107,7 @@ async def universal_exception_handler(request: Request, exc: Exception):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,  # Loaded from environment
-    allow_credentials=True,
+    allow_credentials=False,  # App uses Bearer tokens (headers), not cookies
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["Content-Type"],
