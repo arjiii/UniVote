@@ -123,7 +123,6 @@ async def cast_votes(
     passcode_id: str,
     adviser_id: str,
     votes: list,
-    voting_pin: str,
     session_passcode: str,
 ) -> dict:
     """Insert vote records via RPC and mark the student as voted. Returns receipt info."""
@@ -186,10 +185,10 @@ async def cast_votes(
             detail="This Session Passcode has expired. Please ask your adviser to generate a new one.",
         )
 
-    # 2. VERIFY STUDENT (Layer 3 - Identity & Student PIN)
+    # 2. VERIFY STUDENT (Layer 3 - Identity)
     student_result = (
         await supabase.table("students")
-        .select("id, voting_pin")
+        .select("id")
         .eq("student_id", student_id)
         .execute()
     )
@@ -198,14 +197,6 @@ async def cast_votes(
         raise HTTPException(status_code=404, detail="Student ID not found.")
 
     student_uuid = student_result.data[0]["id"]
-    stored_pin = student_result.data[0].get("voting_pin")
-
-    # Verify Student PIN
-    if not stored_pin or voting_pin != stored_pin:
-        raise HTTPException(
-            status_code=403,
-            detail="Invalid Voting PIN. Please enter the correct PIN to cast your vote.",
-        )
 
     # Use the High-Concurrency RPC for atomic updates
     try:
@@ -231,13 +222,7 @@ async def cast_votes(
         if "vote_count" not in result_dict:
             result_dict["vote_count"] = len(votes)
 
-        # IMPORTANT: Invalidate the PIN immediately after a successful vote
-        await (
-            supabase.table("students")
-            .update({"voting_pin": None})
-            .eq("id", student_uuid)
-            .execute()
-        )
+        # IMPORTANT: Return the result
         return result_dict
     except Exception as e:
         error_msg = str(e)

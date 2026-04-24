@@ -22,10 +22,7 @@
 	let adviserPin = $state(''); // Layer 1 Entry PIN
 	let passcodeId = $state(''); // Linked record ID
 	let adviserId = $state(''); // Adviser UID for persistent session tracking
-	let votingPin = $state('');
-	let pinConfirmInput = $state('');
 	let sessionPasscode = $state(''); // Layer 2 Session Passcode
-	let showPin = $state(false);
 	let isVerifyingPasscode = $state(false);
 
 	/** @type {Record<string, any[]>} */
@@ -158,21 +155,6 @@
 		}
 	}
 
-	async function fetchPin() {
-		if (votingPin) {
-			showPin = true;
-			return;
-		}
-		const session = $voterSession;
-		if (!session?.student_id) return;
-		try {
-			const res = await studentApi.getVotingPin(session.student_id);
-			votingPin = res.voting_pin;
-			showPin = true;
-		} catch (/** @type {any} */ err) {
-			console.error('PIN fetch failed');
-		}
-	}
 
 	async function submitVote() {
 		const session = $voterSession;
@@ -188,7 +170,7 @@
 			}));
 
 		try {
-			const resp = await studentApi.vote(session.student_id ?? '', electionId, passcodeId, adviserId, votes, votingPin, sessionPasscode);
+			const resp = await studentApi.vote(session.student_id ?? '', electionId, passcodeId, adviserId, votes, sessionPasscode);
 			if (resp && resp.receipt_id) receiptId = resp.receipt_id;
 			voterSession.markVoted(electionId);
 			showConfirm = false;
@@ -397,7 +379,7 @@
 				<h3 class="f-title">{allSelected ? 'Protocol Complete' : 'Protocol Pending'}</h3>
 				<p class="f-body">{allSelected ? 'Ballot ready for final encryption.' : `Designate candidates for all ${totalPositions} positions.`}</p>
 			</div>
-			<button class="btn btn-primary lg" disabled={!allSelected} onclick={async () => { await fetchPin(); showConfirm = true; }}>
+			<button class="btn btn-primary lg" disabled={!allSelected} onclick={() => showConfirm = true}>
 				Certify Ballot
 			</button>
 		</div>
@@ -426,20 +408,9 @@
 					{/each}
 				</div>
 
-				<div class="pin-section">
+				<div class="pin-section" style="margin-top:20px;">
 					<div class="pin-header">
-						<span class="p-label">Step 1: Verify Your Unique Voting PIN</span>
-					</div>
-					<div class="pin-reveal" in:fade>
-						<span class="pr-label">Your Secure PIN</span>
-						<span class="pr-val">{votingPin || '••••••'}</span>
-					</div>
-					<p style="font-size:11px;color:var(--muted);margin-bottom:12px;">This unique PIN is required to sign your ballot. We've fetched it for you to ensure a smooth voting experience.</p>
-				</div>
-
-				<div class="pin-section" style="margin-top:20px;border-top:1px dashed var(--border);padding-top:20px;">
-					<div class="pin-header">
-						<span class="p-label">Step 2: 🎲 Adviser Session Code</span>
+						<span class="p-label">🎲 Adviser Session Code</span>
 					</div>
 					<p style="font-size:11px;color:var(--muted);margin-bottom:12px;">Ask your room monitoring adviser for their <strong>8-character Session Code</strong>. This code is tied to the same adviser whose Entry PIN you used.</p>
 					<input type="text" maxlength="8" bind:value={sessionPasscode} placeholder="e.g. 1234567G" class="pin-input" style="text-transform:uppercase;letter-spacing:0.2em;font-family:monospace;">
@@ -447,7 +418,7 @@
 
 				<div class="modal-buttons">
 					<button class="btn btn-ghost flex-1" onclick={() => showConfirm = false}>Cancel</button>
-					<button class="btn btn-primary flex-1" disabled={isSubmitting || !votingPin || sessionPasscode.length < 8} onclick={submitVote}>
+					<button class="btn btn-primary flex-1" disabled={isSubmitting || sessionPasscode.length < 8} onclick={submitVote}>
 						{isSubmitting ? 'Casting…' : 'Cast Vote'}
 					</button>
 				</div>

@@ -51,8 +51,8 @@ async def cast_vote(
         student_id=vote_submit.student_id,
         election_id=vote_submit.election_id,
         passcode_id=vote_submit.passcode_id,
+        adviser_id=vote_submit.adviser_id,
         votes=votes_payload,
-        voting_pin=vote_submit.voting_pin,
         session_passcode=vote_submit.session_passcode,
     )
     # Log voting event

@@ -64,7 +64,6 @@ class VoteSubmit(BaseModel):
     passcode_id: UUID  # Original record ID used at entry
     adviser_id: UUID  # The adviser UID derived during entrance
     votes: List[VoteItem]
-    voting_pin: str
     session_passcode: str  # The 8-char alphanumeric passcode from advisor
 
 
