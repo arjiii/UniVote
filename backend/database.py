@@ -21,8 +21,15 @@ options = ClientOptions(
     storage_client_timeout=30,
 )
 
+# Defer client creation — raises a clear error at runtime instead of crashing at import
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise RuntimeError(
+        "SUPABASE_URL and SUPABASE_KEY environment variables must be set. "
+        "Add them to Railway Variables (or your .env file for local dev)."
+    )
+
 supabase: Client = create_client(
-    SUPABASE_URL or "", SUPABASE_KEY or "", options=options
+    SUPABASE_URL, SUPABASE_KEY, options=options
 )
 
 _async_supabase: Optional[AsyncClient] = None
@@ -32,7 +39,7 @@ async def get_async_supabase() -> AsyncClient:
     global _async_supabase
     if _async_supabase is None:
         _async_supabase = await create_async_client(
-            SUPABASE_URL or "", SUPABASE_KEY or "", options=options
+            SUPABASE_URL, SUPABASE_KEY, options=options
         )
     return _async_supabase
 
